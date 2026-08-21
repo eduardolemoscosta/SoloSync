@@ -1,8 +1,8 @@
-# Gestão Agrícola 🌱
+# Gestão Agrícola 
 
 Um sistema web desenvolvido em Django para o gerenciamento de propriedades rurais, controle de talhões, acompanhamento de safras (plantios) e registros de atividades rotineiras no campo.
 
-## 🚀 Funcionalidades
+## Funcionalidades
 
 - **Gestão de Talhões (Áreas):** Cadastre os espaços de terra da sua propriedade informando área em m², tipo de solo (Arenoso, Argiloso, Misto, Siltoso) e coordenadas geográficas.
 - **Controle de Plantios (Safras):** Acompanhe o que está plantado em cada talhão, desde o preparo do solo até a colheita, com cálculo automático do progresso do ciclo, estimativa da data de colheita e dias restantes.
@@ -10,7 +10,7 @@ Um sistema web desenvolvido em Django para o gerenciamento de propriedades rurai
 - **Controle de Irrigação:** Acompanhe a duração e o volume de água aplicado em cada plantio.
 - **Monitoramento de Ocorrências:** Registre eventos no campo como pragas, doenças, deficiências nutricionais e danos climáticos, além da ação tomada para reverter a situação.
 
-## 🛠️ Tecnologias Utilizadas
+## Tecnologias Utilizadas
 
 - [Python](https://www.python.org/)
 - [Django](https://www.djangoproject.com/) (Framework Web)
@@ -18,13 +18,13 @@ Um sistema web desenvolvido em Django para o gerenciamento de propriedades rurai
 - `python-dotenv` (Variáveis de ambiente)
 - `Pillow` (Processamento de imagens)
 
-## 📋 Pré-requisitos
+## Pré-requisitos
 
 Para rodar este projeto, você precisará ter instalado:
 - [Python 3](https://www.python.org/downloads/)
 - [Git](https://git-scm.com/) (opcional, para clonar)
 
-## ⚙️ Como Executar o Projeto Localmente
+## Como Executar o Projeto Localmente
 
 ```bash
 # Acesse a pasta do projeto
@@ -51,7 +51,7 @@ $ python manage.py runserver
 
 > O servidor iniciará localmente. Acesse em seu navegador: `http://127.0.0.1:8000/` ou `http://localhost:8000/`.
 
-## 📦 Estrutura de Dados Principal
+## Estrutura de Dados Principal
 
 * **Talhão:** Áreas cultiváveis de um usuário específico.
 * **Plantio:** Cultivo ocorrendo dentro de um Talhão, com informações sobre o ciclo, datas e progresso.
