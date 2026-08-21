@@ -79,6 +79,7 @@ class Manejo(models.Model):
         ('Poda/Desbrota', 'Poda/Desbrota'),
         ('Capina/Roçada', 'Capina/Roçada'),
         ('Tratos Culturais', 'Tratos Culturais'),
+        ('Colheita', 'Colheita'),
     ]
 
     plantio = models.ForeignKey(Plantio, on_delete=models.CASCADE, related_name='manejos')

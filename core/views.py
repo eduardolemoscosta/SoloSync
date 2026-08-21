@@ -258,6 +258,41 @@ def dividir_talhao_mapa(request):
 
     return redirect('talhao_list')
 
+@login_required
+@require_POST
+def registrar_colheita(request, pk):
+    plantio = get_object_or_404(Plantio, pk=pk, talhao__usuario=request.user)
+    
+    data_colheita = request.POST.get('data_colheita')
+    quantidade = request.POST.get('quantidade', '')
+    destino = request.POST.get('destino_talhao')
+    observacoes = request.POST.get('observacoes', '')
+
+    try:
+        with transaction.atomic():
+            # Atualiza o status do plantio
+            if destino in dict(Plantio.STATUS_CHOICES):
+                plantio.status = destino
+                plantio.save()
+
+            # Cria registro de Manejo de Colheita
+            if data_colheita:
+                from datetime import datetime
+                Manejo.objects.create(
+                    plantio=plantio,
+                    data=datetime.strptime(data_colheita, '%Y-%m-%d').date(),
+                    tipo_operacao='Colheita',
+                    produto_insumo='Produção colhida',
+                    dosagem_quantidade=quantidade,
+                    observacoes=observacoes
+                )
+
+        messages.success(request, f'Colheita registrada com sucesso para o plantio de {plantio.cultura}!')
+    except Exception as e:
+        messages.error(request, f'Erro ao registrar colheita: {str(e)}')
+
+    return redirect('plantio_list')
+
 # Plantio Views
 class PlantioListView(LoginRequiredMixin, ListView):
     model = Plantio

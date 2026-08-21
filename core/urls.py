@@ -19,6 +19,7 @@ urlpatterns = [
     path('plantios/<int:pk>/', views.PlantioDetailView.as_view(), name='plantio_detail'),
     path('plantios/<int:pk>/editar/', views.PlantioUpdateView.as_view(), name='plantio_update'),
     path('plantios/<int:pk>/excluir/', views.PlantioDeleteView.as_view(), name='plantio_delete'),
+    path('plantios/<int:pk>/colher/', views.registrar_colheita, name='plantio_colher'),
     
     path('manejos/novo/', views.ManejoCreateView.as_view(), name='manejo_create'),
     path('irrigacoes/nova/', views.IrrigacaoCreateView.as_view(), name='irrigacao_create'),

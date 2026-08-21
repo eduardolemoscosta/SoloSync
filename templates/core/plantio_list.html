@@ -66,13 +66,60 @@
                 </div>
             </div>
             <div class="card-footer bg-white border-top-0 d-flex justify-content-between">
-                <a href="{% url 'plantio_detail' plantio.id %}" class="btn btn-outline-primary btn-sm">Detalhes</a>
+                <div>
+                    <a href="{% url 'plantio_detail' plantio.id %}" class="btn btn-outline-primary btn-sm">Detalhes</a>
+                    {% if plantio.status == 'ATIVO' or plantio.status == 'COLHEITA' %}
+                        <button type="button" class="btn btn-success btn-sm ms-1" data-bs-toggle="modal" data-bs-target="#modalColherPlantio{{ plantio.id }}">🌾 Colher</button>
+                    {% endif %}
+                </div>
                 <div>
                     <a href="{% url 'plantio_update' plantio.id %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-pencil"></i></a>
                     <a href="{% url 'plantio_delete' plantio.id %}" class="btn btn-outline-danger btn-sm"><i class="bi bi-trash"></i></a>
                 </div>
             </div>
         </div>
+        
+        {% if plantio.status == 'ATIVO' or plantio.status == 'COLHEITA' %}
+        <!-- Modal Colher -->
+        <div class="modal fade" id="modalColherPlantio{{ plantio.id }}" tabindex="-1" aria-labelledby="modalColherLabel{{ plantio.id }}" aria-hidden="true">
+          <div class="modal-dialog">
+            <div class="modal-content">
+              <form method="post" action="{% url 'plantio_colher' plantio.id %}">
+                {% csrf_token %}
+                <div class="modal-header bg-success text-white">
+                  <h5 class="modal-title" id="modalColherLabel{{ plantio.id }}">🌾 Registrar Colheita: {{ plantio.cultura }}</h5>
+                  <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                  <div class="mb-3">
+                    <label class="form-label">Data da Colheita</label>
+                    <input type="date" name="data_colheita" class="form-control" value="{% now 'Y-m-d' %}" required>
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label">Quantidade Colhida (Opcional)</label>
+                    <input type="text" name="quantidade" class="form-control" placeholder="Ex: 500 kg, 20 sacas, 3 ton...">
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label">Destino do Talhão</label>
+                    <select name="destino_talhao" class="form-select" required>
+                        <option value="FINALIZADO" selected>Finalizar Plantio (Liberar talhão)</option>
+                        <option value="COLHEITA">Manter em colheita contínua</option>
+                    </select>
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label">Observações</label>
+                    <textarea name="observacoes" class="form-control" rows="2" placeholder="Notas sobre a colheita, perdas, qualidade..."></textarea>
+                  </div>
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                  <button type="submit" class="btn btn-success">Confirmar Colheita</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+        {% endif %}
     </div>
     {% empty %}
     <div class="col">
