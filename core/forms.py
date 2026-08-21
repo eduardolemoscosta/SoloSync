@@ -40,7 +40,6 @@ class PlantioForm(forms.ModelForm):
         ciclo = cleaned_data.get('ciclo_dias_estimado')
 
         if status == 'PREPARO':
-            # Limpa valores padrão ou mantem como "Preparo de Solo"
             cleaned_data['cultura'] = cultura or "Preparo de Solo"
             cleaned_data['variedade'] = ""
             cleaned_data['data_plantio'] = None

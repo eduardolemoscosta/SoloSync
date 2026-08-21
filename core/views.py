@@ -31,7 +31,6 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         context['plantios_andamento'] = plantios.exclude(status='FINALIZADO').order_by('-data_plantio')
         return context
 
-# Talhao Views
 class TalhaoListView(LoginRequiredMixin, ListView):
     model = Talhao
     template_name = 'core/talhao_list.html'
@@ -117,7 +116,6 @@ def unir_talhoes(request):
         messages.error(request, 'Talhões inválidos ou não pertencem a você.')
         return redirect('talhao_list')
 
-    # Validação de plantios ativos
     if Plantio.objects.filter(talhao__in=talhoes, status__in=['ATIVO', 'PREPARO', 'COLHEITA']).exists():
         messages.error(request, 'Não é possível unir talhões que possuem plantios ativos. Finalize-os primeiro.')
         return redirect('talhao_list')
@@ -126,7 +124,6 @@ def unir_talhoes(request):
         with transaction.atomic():
             area_total = sum(t.area_m2 for t in talhoes)
             
-            # --- Merge de Coordenadas (GeoJSON MultiPolygon) ---
             import json
             multipolygon_coords = []
             for t in talhoes:
@@ -155,9 +152,7 @@ def unir_talhoes(request):
                     },
                     "properties": {}
                 }
-            # ----------------------------------------------------
 
-            # 1. Instanciar novo e forçar request.user
             novo_talhao = Talhao(
                 nome=novo_nome,
                 area_m2=area_total,
@@ -167,13 +162,10 @@ def unir_talhoes(request):
             )
             novo_talhao.usuario = request.user
             
-            # 2. Salvar para gerar o ID ANTES de reatribuir
             novo_talhao.save()
             
-            # 3. Transferir plantios históricos (Mantém Manejos e Irrigações)
             Plantio.objects.filter(talhao__in=talhoes).update(talhao=novo_talhao)
             
-            # 4. Deletar (ou inativar) talhões originais
             talhoes.delete()
             
             messages.success(request, f'Sucesso: "{novo_nome}" criado com {area_total} m² e todo histórico preservado.')
@@ -244,9 +236,6 @@ def dividir_talhao_mapa(request):
                     coordenadas=geojson
                 )
             
-            # Atualizar os plantios para a primeira fração (ou deixá-los atrelados ao que sobrou, mas aqui excluímos o pai)
-            # Como o corte substitui a área pai, plantios devem ser finalizados ou reatribuídos.
-            # Se for reatribuir, atribuímos ao maior ou ao primeiro. Por segurança, apenas transferimos para o primeiro pedaço.
             primeiro_novo = Talhao.objects.filter(usuario=request.user, nome=nomes[0]).last()
             Plantio.objects.filter(talhao=talhao).update(talhao=primeiro_novo)
             
@@ -270,12 +259,10 @@ def registrar_colheita(request, pk):
 
     try:
         with transaction.atomic():
-            # Atualiza o status do plantio
             if destino in dict(Plantio.STATUS_CHOICES):
                 plantio.status = destino
                 plantio.save()
 
-            # Cria registro de Manejo de Colheita
             if data_colheita:
                 from datetime import datetime
                 Manejo.objects.create(
@@ -293,7 +280,6 @@ def registrar_colheita(request, pk):
 
     return redirect('plantio_list')
 
-# Plantio Views
 class PlantioListView(LoginRequiredMixin, ListView):
     model = Plantio
     template_name = 'core/plantio_list.html'
@@ -329,7 +315,6 @@ class PlantioDetailView(LoginRequiredMixin, DetailView):
         return Plantio.objects.filter(talhao__usuario=self.request.user)
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        # unificar historico
         manejos = list(self.object.manejos.all())
         irrigacoes = list(self.object.irrigacoes.all())
         ocorrencias = list(self.object.ocorrencias.all())
@@ -378,7 +363,6 @@ class PlantioDeleteView(LoginRequiredMixin, DeleteView):
     def get_queryset(self):
         return Plantio.objects.filter(talhao__usuario=self.request.user)
 
-# Manejo, Irrigacao, Ocorrencia Create Views
 class ManejoCreateView(LoginRequiredMixin, CreateView):
     model = Manejo
     form_class = ManejoForm
