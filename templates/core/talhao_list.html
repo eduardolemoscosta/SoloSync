@@ -1,0 +1,99 @@
+{% extends 'index.html' %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h2>Meus Talhões</h2>
+    <a href="{% url 'talhao_create' %}" class="btn btn-success"><i class="bi bi-plus-lg"></i> Novo Talhão</a>
+</div>
+
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+    #mapAll { height: 350px; width: 100%; border-radius: 5px; margin-bottom: 20px; border: 1px solid #ccc; z-index: 1;}
+</style>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-success text-white">
+        <h5 class="mb-0"><i class="bi bi-map"></i> Visão Geral das Áreas</h5>
+    </div>
+    <div class="card-body p-1">
+        <div id="mapAll"></div>
+    </div>
+</div>
+
+<div class="table-responsive">
+    <table class="table table-hover">
+        <thead class="table-light">
+            <tr>
+                <th>Nome</th>
+                <th>Área (m²)</th>
+                <th>Tipo de Solo</th>
+                <th>Ações</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for talhao in talhoes %}
+            <tr>
+                <td>{{ talhao.nome }}</td>
+                <td>{{ talhao.area_m2 }}</td>
+                <td>{{ talhao.tipo_solo }}</td>
+                <td>
+                    <a href="{% url 'talhao_update' talhao.id %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil"></i> Editar</a>
+                    <a href="{% url 'talhao_delete' talhao.id %}" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i> Excluir</a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="4" class="text-center">Nenhum talhão cadastrado.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        var map = L.map('mapAll').setView([-14.235, -51.925], 4);
+        
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles &copy; Esri'
+        }).addTo(map);
+
+        var talhoes = JSON.parse('{{ talhoes_json|escapejs }}');
+        
+        if (talhoes.length > 0) {
+            var allItems = new L.FeatureGroup();
+            
+            talhoes.forEach(function(t) {
+                if(t.geojson) {
+                    var parsed;
+                    if(typeof t.geojson === 'string') {
+                        try { parsed = JSON.parse(t.geojson); } catch(e) { parsed = null; }
+                    } else {
+                        parsed = t.geojson;
+                    }
+                    
+                    if(parsed) {
+                        var layer = L.geoJSON(parsed, {
+                            style: { color: '#00ff00', weight: 2, fillOpacity: 0.3 }
+                        });
+                        layer.bindPopup('<b>' + t.nome + '</b><br>Área: ' + t.area + ' m²');
+                        allItems.addLayer(layer);
+                    }
+                }
+            });
+            
+            if (allItems.getLayers().length > 0) {
+                map.addLayer(allItems);
+                map.fitBounds(allItems.getBounds(), {padding: [20, 20]});
+            } else {
+                map.locate({setView: true, maxZoom: 10});
+            }
+        } else {
+            map.locate({setView: true, maxZoom: 10});
+        }
+    });
+</script>
+{% endblock %}

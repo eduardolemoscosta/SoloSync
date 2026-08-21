@@ -1,0 +1,160 @@
+{% extends 'index.html' %}
+
+{% block content %}
+<!-- Leaflet & Geoman CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.css" />
+
+<style>
+    #map { height: 400px; width: 100%; border-radius: 5px; margin-bottom: 20px; border: 1px solid #ccc; z-index: 1;}
+</style>
+
+<div class="row justify-content-center mt-4">
+    <div class="col-md-10">
+        <div class="card shadow-sm">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0">{{ title }}</h5>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    {% if form.non_field_errors %}
+                        <div class="alert alert-danger">
+                            {% for error in form.non_field_errors %}
+                                {{ error }}
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+
+                    <div class="row">
+                        <!-- Formulário -->
+                        <div class="col-md-5">
+                            {% for field in form %}
+                                {% if field.name == 'coordenadas' %}
+                                    {{ field }}
+                                {% else %}
+                                    <div class="mb-3">
+                                        <label for="{{ field.id_for_label }}" class="form-label fw-bold">{{ field.label }}</label>
+                                        {{ field }}
+                                        {% if field.help_text %}
+                                            <div class="form-text">{{ field.help_text }}</div>
+                                        {% endif %}
+                                        {% for error in field.errors %}
+                                            <div class="text-danger small">{{ error }}</div>
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                        
+                        <!-- Mapa -->
+                        <div class="col-md-7">
+                            <label class="form-label fw-bold">Desenhe a área do talhão</label>
+                            <div id="map"></div>
+                            <small class="text-muted">Use as ferramentas no lado esquerdo do mapa para desenhar ou editar o polígono. A área será calculada automaticamente.</small>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between mt-4 border-top pt-3">
+                        <button type="button" class="btn btn-outline-secondary" onclick="window.history.back();">Cancelar</button>
+                        <button type="submit" class="btn btn-success">Salvar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Scripts Leaflet, Geoman e Turf -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.js"></script>
+<script src="https://unpkg.com/@turf/turf/turf.min.js"></script>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        // Inicializa mapa (centralizado provisoriamente no Brasil)
+        var map = L.map('map').setView([-14.235, -51.925], 4);
+
+        // Adiciona camada de Satélite (Esri World Imagery)
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles &copy; Esri'
+        }).addTo(map);
+
+        // Adiciona controles do Geoman
+        map.pm.addControls({
+            position: 'topleft',
+            drawMarker: false,
+            drawCircleMarker: false,
+            drawPolyline: false,
+            drawRectangle: false,
+            drawCircle: false,
+            drawText: false,
+            editMode: true,
+            dragMode: false,
+            cutPolygon: false,
+            removalMode: true,
+            drawPolygon: true,
+        });
+
+        var inputCoordenadas = document.getElementById('id_coordenadas');
+        var inputArea = document.getElementById('id_area_m2');
+        var drawnItems = new L.FeatureGroup();
+        map.addLayer(drawnItems);
+
+        // Carrega polígono se estiver editando
+        if (inputCoordenadas.value) {
+            try {
+                var geojsonData = JSON.parse(inputCoordenadas.value);
+                var geojsonLayer = L.geoJSON(geojsonData);
+                geojsonLayer.eachLayer(function(layer) {
+                    drawnItems.addLayer(layer);
+                });
+                map.fitBounds(drawnItems.getBounds());
+            } catch (e) {
+                console.error("Erro ao carregar coordenadas", e);
+            }
+        } else {
+            // Tenta obter localização atual para facilitar
+            map.locate({setView: true, maxZoom: 16});
+        }
+
+        // Função para atualizar inputs quando polígono muda
+        function updateInputs() {
+            var layers = drawnItems.getLayers();
+            if (layers.length > 0) {
+                // Pega a primeira camada (assume um polígono por talhão)
+                var layer = layers[0];
+                var geojson = layer.toGeoJSON();
+                inputCoordenadas.value = JSON.stringify(geojson);
+
+                // Calcula área com Turf.js
+                var areaSqMeters = turf.area(geojson);
+                inputArea.value = areaSqMeters.toFixed(2);
+            } else {
+                inputCoordenadas.value = '';
+                inputArea.value = '';
+            }
+        }
+
+        // Eventos do Geoman
+        map.on('pm:create', function(e) {
+            // Se já houver um polígono, remove (limita a 1 polígono)
+            drawnItems.clearLayers();
+            drawnItems.addLayer(e.layer);
+            updateInputs();
+
+            // Adiciona eventos de edição na nova camada
+            e.layer.on('pm:edit', updateInputs);
+        });
+
+        map.on('pm:remove', function(e) {
+            drawnItems.removeLayer(e.layer);
+            updateInputs();
+        });
+
+        // Eventos de edição para camadas já existentes
+        drawnItems.on('pm:edit', updateInputs);
+    });
+</script>
+{% endblock %}

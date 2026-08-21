@@ -1,0 +1,23 @@
+{% extends 'index.html' %}
+
+{% block content %}
+<div class="row justify-content-center mt-5">
+    <div class="col-md-6">
+        <div class="card shadow-sm border-danger">
+            <div class="card-header bg-danger text-white">
+                <h5 class="mb-0">Confirmar Exclusão</h5>
+            </div>
+            <div class="card-body text-center">
+                <p class="fs-5 mt-3">Você tem certeza que deseja excluir <strong>{{ object }}</strong>?</p>
+                <p class="text-muted">Esta ação não pode ser desfeita.</p>
+                
+                <form method="post" class="mt-4">
+                    {% csrf_token %}
+                    <a href="javascript:history.back()" class="btn btn-outline-secondary me-2">Cancelar</a>
+                    <button type="submit" class="btn btn-danger">Sim, excluir</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

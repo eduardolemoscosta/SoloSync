@@ -1,0 +1,82 @@
+{% extends 'index.html' %}
+
+{% block content %}
+<div class="row justify-content-center mt-4">
+    <div class="col-md-8 col-lg-6">
+        <div class="card shadow-sm">
+            <div class="card-header bg-success text-white text-center">
+                <h4 class="mb-0"><i class="bi bi-person-plus"></i> Criar Conta</h4>
+            </div>
+            <div class="card-body p-4">
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    {% if form.non_field_errors %}
+                        <div class="alert alert-danger">
+                            {% for error in form.non_field_errors %}
+                                {{ error }}
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+
+                    {% for field in form %}
+                        <div class="mb-3">
+                            <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
+                            {% if 'password' in field.name %}
+                                <div class="input-group">
+                                    {{ field }}
+                                    <button class="btn btn-outline-secondary toggle-password" type="button" tabindex="-1">
+                                        <i class="bi bi-eye-slash"></i>
+                                    </button>
+                                </div>
+                            {% else %}
+                                {{ field }}
+                            {% endif %}
+                            {% if field.help_text %}
+                                <div class="form-text small">{{ field.help_text }}</div>
+                            {% endif %}
+                            {% for error in field.errors %}
+                                <div class="text-danger small">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                    {% endfor %}
+
+                    <button type="submit" class="btn btn-success w-100 mt-3">Cadastrar</button>
+                    
+                    <div class="text-center mt-3">
+                        <small>Já tem conta? <a href="{% url 'login' %}" class="text-success">Faça login</a></small>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        var inputs = document.querySelectorAll('input');
+        for (var i = 0; i < inputs.length; i++) {
+            if (inputs[i].type !== 'hidden' && inputs[i].type !== 'submit') {
+                inputs[i].classList.add('form-control');
+            }
+        }
+        
+        var toggleButtons = document.querySelectorAll('.toggle-password');
+        toggleButtons.forEach(function(button) {
+            button.addEventListener('click', function() {
+                // The input field is previous sibling to the button in the DOM (wait, it might have whitespace, let's just get the input in the parent input-group)
+                var input = this.closest('.input-group').querySelector('input');
+                var icon = this.querySelector('i');
+                if (input.type === 'password') {
+                    input.type = 'text';
+                    icon.classList.remove('bi-eye-slash');
+                    icon.classList.add('bi-eye');
+                } else {
+                    input.type = 'password';
+                    icon.classList.remove('bi-eye');
+                    icon.classList.add('bi-eye-slash');
+                }
+            });
+        });
+    });
+</script>
+{% endblock %}

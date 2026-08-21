@@ -1,0 +1,42 @@
+{% extends 'index.html' %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h2>Meus Plantios</h2>
+    <a href="{% url 'plantio_create' %}" class="btn btn-success"><i class="bi bi-plus-lg"></i> Novo Plantio</a>
+</div>
+
+<div class="row">
+    {% for plantio in plantios %}
+    <div class="col-md-6 col-lg-4 mb-4">
+        <div class="card h-100 shadow-sm">
+            <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">{{ plantio.cultura }}</h5>
+                <span class="badge bg-light text-dark">{{ plantio.get_status_display }}</span>
+            </div>
+            <div class="card-body">
+                <p><strong>Talhão:</strong> {{ plantio.talhao.nome }}</p>
+                <p><strong>Variedade:</strong> {{ plantio.variedade|default:"Não informada" }}</p>
+                <p><strong>Plantio:</strong> {{ plantio.data_plantio|default:"Não definido" }}</p>
+                <p><strong>Ciclo:</strong> {{ plantio.ciclo_dias_estimado }} dias</p>
+                
+                <div class="progress mb-3" style="height: 15px;">
+                    <div class="progress-bar bg-success" role="progressbar" style="width: {{ plantio.progresso_ciclo_porcentagem }}%;"></div>
+                </div>
+            </div>
+            <div class="card-footer bg-white border-top-0 d-flex justify-content-between">
+                <a href="{% url 'plantio_detail' plantio.id %}" class="btn btn-outline-primary btn-sm">Detalhes</a>
+                <div>
+                    <a href="{% url 'plantio_update' plantio.id %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-pencil"></i></a>
+                    <a href="{% url 'plantio_delete' plantio.id %}" class="btn btn-outline-danger btn-sm"><i class="bi bi-trash"></i></a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% empty %}
+    <div class="col">
+        <div class="alert alert-info">Nenhum plantio cadastrado.</div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

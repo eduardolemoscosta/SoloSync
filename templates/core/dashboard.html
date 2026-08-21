@@ -1,0 +1,81 @@
+{% extends 'index.html' %}
+
+{% block title %}Dashboard - Gestão Agrícola{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Dashboard</h1>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-4 mb-3">
+        <div class="card text-bg-success">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-play-circle"></i> Plantios Ativos</h5>
+                <h2 class="display-4">{{ plantios_ativos }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="card text-bg-warning">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-clock-history"></i> Áreas em Preparo</h5>
+                <h2 class="display-4">{{ areas_preparo }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="card text-bg-primary">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-geo-alt"></i> Total de Talhões</h5>
+                <h2 class="display-4">{{ total_talhoes }}</h2>
+            </div>
+        </div>
+    </div>
+</div>
+
+<h4>Plantios em Andamento</h4>
+<div class="table-responsive">
+    <table class="table table-striped table-hover align-middle">
+        <thead class="table-dark">
+            <tr>
+                <th>Cultura</th>
+                <th>Talhão</th>
+                <th>Status</th>
+                <th>Dias Decorridos</th>
+                <th>Progresso do Ciclo</th>
+                <th>Ações</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for p in plantios_andamento %}
+            <tr>
+                <td><strong>{{ p.cultura }}</strong></td>
+                <td>{{ p.talhao.nome }}</td>
+                <td><span class="badge bg-secondary">{{ p.get_status_display }}</span></td>
+                <td>{{ p.dias_decorridos }} / {{ p.ciclo_dias_estimado }}</td>
+                <td>
+                    <div class="progress" style="height: 20px;">
+                        <div class="progress-bar {% if p.progresso_ciclo_porcentagem > 80 %}bg-success{% else %}bg-primary{% endif %}" role="progressbar" style="width: {{ p.progresso_ciclo_porcentagem }}%;" aria-valuenow="{{ p.progresso_ciclo_porcentagem }}" aria-valuemin="0" aria-valuemax="100">{{ p.progresso_ciclo_porcentagem }}%</div>
+                    </div>
+                </td>
+                <td>
+                    <a href="{% url 'plantio_detail' p.id %}" class="btn btn-sm btn-info text-white" title="Detalhes"><i class="bi bi-eye"></i></a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="6" class="text-center">Nenhum plantio em andamento.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="mt-4">
+    <h5>Ações Rápidas</h5>
+    <a href="{% url 'manejo_create' %}" class="btn btn-outline-success me-2"><i class="bi bi-tools"></i> Registrar Manejo</a>
+    <a href="{% url 'irrigacao_create' %}" class="btn btn-outline-primary me-2"><i class="bi bi-droplet"></i> Registrar Irrigação</a>
+    <a href="{% url 'ocorrencia_create' %}" class="btn btn-outline-danger"><i class="bi bi-bug"></i> Registrar Ocorrência</a>
+</div>
+{% endblock %}
