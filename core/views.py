@@ -64,6 +64,10 @@ class TalhaoCreateView(LoginRequiredMixin, CreateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['title'] = 'Novo Talhão'
+        import json
+        existentes = Talhao.objects.filter(usuario=self.request.user).exclude(coordenadas__isnull=True)
+        data = [{'nome': t.nome, 'geojson': t.coordenadas} for t in existentes]
+        context['talhoes_existentes_json'] = json.dumps(data)
         return context
 
 class TalhaoUpdateView(LoginRequiredMixin, UpdateView):
@@ -76,6 +80,10 @@ class TalhaoUpdateView(LoginRequiredMixin, UpdateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['title'] = 'Editar Talhão'
+        import json
+        existentes = Talhao.objects.filter(usuario=self.request.user).exclude(pk=self.object.pk).exclude(coordenadas__isnull=True)
+        data = [{'nome': t.nome, 'geojson': t.coordenadas} for t in existentes]
+        context['talhoes_existentes_json'] = json.dumps(data)
         return context
 
 class TalhaoDeleteView(LoginRequiredMixin, DeleteView):

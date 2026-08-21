@@ -101,12 +101,68 @@
         var inputArea = document.getElementById('id_area_m2');
         var drawnItems = new L.FeatureGroup();
         map.addLayer(drawnItems);
+        
+        // --- Exibição de Talhões Existentes ---
+        var existentesGroup = new L.FeatureGroup();
+        var geojsonExistentesArray = []; // Para validação de sobreposição
+
+        var talhoesExistentes = [];
+        try {
+            var rawJson = '{{ talhoes_existentes_json|default:"[]"|escapejs }}';
+            if (rawJson) {
+                talhoesExistentes = JSON.parse(rawJson);
+            }
+        } catch (e) {
+            console.error("Erro ao fazer parse dos talhões existentes:", e);
+        }
+
+        if (talhoesExistentes && talhoesExistentes.length > 0) {
+            talhoesExistentes.forEach(function(t) {
+                if (t.geojson) {
+                    try {
+                        var parsed = typeof t.geojson === 'string' ? JSON.parse(t.geojson) : t.geojson;
+                        
+                        // Garante que é um objeto geojson válido
+                        if (parsed && Object.keys(parsed).length > 0) {
+                            geojsonExistentesArray.push(parsed);
+
+                            var layer = L.geoJSON(parsed, {
+                                style: { color: '#aaaaaa', weight: 2, fillOpacity: 0.2, dashArray: '5, 5' },
+                                interactive: true
+                            });
+                            layer.bindTooltip(t.nome, {className: 'bg-light text-dark fw-bold'});
+                            
+                            // Geoman ignora essas camadas
+                            layer.eachLayer(function(l) {
+                                l.options.pmIgnore = true;
+                            });
+
+                            existentesGroup.addLayer(layer);
+                        }
+                    } catch (e) {
+                        console.error("Erro ao carregar talhão existente:", t.nome, e);
+                    }
+                }
+            });
+            
+            if (existentesGroup.getLayers().length > 0) {
+                map.addLayer(existentesGroup);
+                
+                // Ajusta mapa se for um novo talhão (input vazio)
+                if (!inputCoordenadas.value) {
+                    map.fitBounds(existentesGroup.getBounds(), {padding: [20, 20], maxZoom: 16});
+                }
+            }
+        }
+        // --------------------------------------
 
         // Carrega polígono se estiver editando
         if (inputCoordenadas.value) {
             try {
                 var geojsonData = JSON.parse(inputCoordenadas.value);
-                var geojsonLayer = L.geoJSON(geojsonData);
+                var geojsonLayer = L.geoJSON(geojsonData, {
+                    style: { color: '#00ff00', weight: 3 }
+                });
                 geojsonLayer.eachLayer(function(layer) {
                     drawnItems.addLayer(layer);
                 });
@@ -114,6 +170,21 @@
             } catch (e) {
                 console.error("Erro ao carregar coordenadas", e);
             }
+        }
+        
+        function checkOverlap(newGeojson) {
+            var hasOverlap = false;
+            try {
+                geojsonExistentesArray.forEach(function(existente) {
+                    var intersection = turf.intersect(newGeojson, existente);
+                    if (intersection) {
+                        hasOverlap = true;
+                    }
+                });
+            } catch (e) {
+                console.error("Erro na verificação de sobreposição", e);
+            }
+            return hasOverlap;
         }
 
         // Função para atualizar inputs quando polígono muda
@@ -123,6 +194,15 @@
                 // Pega a primeira camada (assume um polígono por talhão)
                 var layer = layers[0];
                 var geojson = layer.toGeoJSON();
+                
+                // Validação de Sobreposição
+                if (checkOverlap(geojson)) {
+                    alert("Atenção: O polígono desenhado sobrepõe um talhão já existente! Por favor, ajuste os limites.");
+                    layer.setStyle({color: 'red', fillColor: 'red'});
+                } else {
+                    layer.setStyle({color: '#00ff00', fillColor: '#00ff00'});
+                }
+
                 inputCoordenadas.value = JSON.stringify(geojson);
 
                 // Calcula área com Turf.js
@@ -138,6 +218,7 @@
         map.on('pm:create', function(e) {
             // Se já houver um polígono, remove (limita a 1 polígono)
             drawnItems.clearLayers();
+            e.layer.setStyle({color: '#00ff00', weight: 3});
             drawnItems.addLayer(e.layer);
             updateInputs();
 

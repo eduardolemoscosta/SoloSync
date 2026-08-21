@@ -91,7 +91,11 @@
             attribution: 'Tiles &copy; Esri'
         }).addTo(map);
 
-        var plantios = JSON.parse('{{ plantios_json|escapejs }}');
+        var plantios = [];
+        try {
+            var rawJson = '{{ plantios_json|default:"[]"|escapejs }}';
+            if (rawJson) plantios = JSON.parse(rawJson);
+        } catch(e) { console.error(e); }
         
         if (plantios.length > 0) {
             var allItems = new L.FeatureGroup();
@@ -100,45 +104,42 @@
             
             plantios.forEach(function(p) {
                 if(p.geojson) {
-                    var parsed;
-                    if(typeof p.geojson === 'string') {
-                        try { parsed = JSON.parse(p.geojson); } catch(e) { parsed = null; }
-                    } else {
-                        parsed = p.geojson;
-                    }
-                    
-                    if(parsed) {
-                        var layer = L.geoJSON(parsed, { style: baseStyle });
+                    try {
+                        var parsed = typeof p.geojson === 'string' ? JSON.parse(p.geojson) : p.geojson;
                         
-                        var tooltipContent = `
-                            <div class="custom-tooltip">
-                                <h6>${p.cultura} - <span class="badge bg-secondary">${p.status}</span></h6>
-                                <p><strong>Talhão:</strong> ${p.talhao}</p>
-                                <p><strong>Variedade:</strong> ${p.variedade}</p>
-                                <p><strong>Plantio:</strong> ${p.data_plantio} (${p.ciclo} dias)</p>
-                                <p><strong>Progresso:</strong> ${p.status_dias}</p>
-                            </div>
-                        `;
-                        
-                        layer.bindTooltip(tooltipContent, {
-                            sticky: true,
-                            className: 'bg-white',
-                            opacity: 0.95
-                        });
-                        
-                        layer.on('mouseover', function(e) {
-                            var targetLayer = e.target;
-                            targetLayer.setStyle(hoverStyle);
-                            targetLayer.bringToFront();
-                        });
-                        
-                        layer.on('mouseout', function(e) {
-                            var targetLayer = e.target;
-                            targetLayer.setStyle(baseStyle);
-                        });
-                        
-                        allItems.addLayer(layer);
-                    }
+                        if(parsed && Object.keys(parsed).length > 0) {
+                            var layer = L.geoJSON(parsed, { style: baseStyle });
+                            
+                            var tooltipContent = `
+                                <div class="custom-tooltip">
+                                    <h6>${p.cultura} - <span class="badge bg-secondary">${p.status}</span></h6>
+                                    <p><strong>Talhão:</strong> ${p.talhao}</p>
+                                    <p><strong>Variedade:</strong> ${p.variedade}</p>
+                                    <p><strong>Plantio:</strong> ${p.data_plantio} (${p.ciclo} dias)</p>
+                                    <p><strong>Progresso:</strong> ${p.status_dias}</p>
+                                </div>
+                            `;
+                            
+                            layer.bindTooltip(tooltipContent, {
+                                sticky: true,
+                                className: 'bg-white',
+                                opacity: 0.95
+                            });
+                            
+                            layer.on('mouseover', function(e) {
+                                var targetLayer = e.target;
+                                targetLayer.setStyle(hoverStyle);
+                                targetLayer.bringToFront();
+                            });
+                            
+                            layer.on('mouseout', function(e) {
+                                var targetLayer = e.target;
+                                targetLayer.setStyle(baseStyle);
+                            });
+                            
+                            allItems.addLayer(layer);
+                        }
+                    } catch(e) { console.error(e); }
                 }
             });
             

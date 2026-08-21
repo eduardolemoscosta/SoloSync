@@ -61,27 +61,27 @@
             attribution: 'Tiles &copy; Esri'
         }).addTo(map);
 
-        var talhoes = JSON.parse('{{ talhoes_json|escapejs }}');
+        var talhoes = [];
+        try {
+            var rawJson = '{{ talhoes_json|default:"[]"|escapejs }}';
+            if(rawJson) talhoes = JSON.parse(rawJson);
+        } catch(e) { console.error(e); }
         
         if (talhoes.length > 0) {
             var allItems = new L.FeatureGroup();
             
             talhoes.forEach(function(t) {
                 if(t.geojson) {
-                    var parsed;
-                    if(typeof t.geojson === 'string') {
-                        try { parsed = JSON.parse(t.geojson); } catch(e) { parsed = null; }
-                    } else {
-                        parsed = t.geojson;
-                    }
-                    
-                    if(parsed) {
-                        var layer = L.geoJSON(parsed, {
-                            style: { color: '#00ff00', weight: 2, fillOpacity: 0.3 }
-                        });
-                        layer.bindPopup('<b>' + t.nome + '</b><br>Área: ' + t.area + ' m²');
-                        allItems.addLayer(layer);
-                    }
+                    try {
+                        var parsed = typeof t.geojson === 'string' ? JSON.parse(t.geojson) : t.geojson;
+                        if(parsed && Object.keys(parsed).length > 0) {
+                            var layer = L.geoJSON(parsed, {
+                                style: { color: '#00ff00', weight: 2, fillOpacity: 0.3 }
+                            });
+                            layer.bindPopup('<b>' + t.nome + '</b><br>Área: ' + t.area + ' m²');
+                            allItems.addLayer(layer);
+                        }
+                    } catch(e) { console.error(e); }
                 }
             });
             
