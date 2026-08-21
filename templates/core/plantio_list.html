@@ -87,8 +87,10 @@
     document.addEventListener("DOMContentLoaded", function() {
         var map = L.map('mapPlantios').setView([-6.1597, -35.6022], 14);
         
-        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-            attribution: 'Tiles &copy; Esri'
+        L.tileLayer('https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+            maxZoom: 20,
+            subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+            attribution: '&copy; Google Maps'
         }).addTo(map);
 
         var plantios = [];
@@ -108,7 +110,15 @@
                         var parsed = typeof p.geojson === 'string' ? JSON.parse(p.geojson) : p.geojson;
                         
                         if(parsed && Object.keys(parsed).length > 0) {
-                            var layer = L.geoJSON(parsed, { style: baseStyle });
+                            var layer = L.geoJSON(parsed, { 
+                                style: baseStyle,
+                                coordsToLatLng: function(coords) {
+                                    if (coords[0] > -30 && coords[1] < -30) {
+                                        return new L.LatLng(coords[0], coords[1]);
+                                    }
+                                    return new L.LatLng(coords[1], coords[0]);
+                                }
+                            });
                             
                             var tooltipContent = `
                                 <div class="custom-tooltip">

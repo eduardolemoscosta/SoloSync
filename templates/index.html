@@ -55,6 +55,14 @@
             </nav>
 
             <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 content-area">
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show mt-3" role="alert">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
                 {% block content %}
                 {% endblock %}
             </main>

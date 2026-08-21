@@ -93,6 +93,171 @@ class TalhaoDeleteView(LoginRequiredMixin, DeleteView):
     def get_queryset(self):
         return Talhao.objects.filter(usuario=self.request.user)
 
+from django.db import transaction
+from django.contrib import messages
+from django.views.decorators.http import require_POST
+from django.contrib.auth.decorators import login_required
+from decimal import Decimal
+
+@login_required
+@require_POST
+def unir_talhoes(request):
+    talhao_ids = request.POST.getlist('talhoes_ids')
+    novo_nome = request.POST.get('novo_nome')
+    tipo_solo = request.POST.get('tipo_solo', 'Misto')
+    observacoes = request.POST.get('observacoes', '')
+
+    if len(talhao_ids) < 2:
+        messages.error(request, 'Selecione pelo menos 2 talhões para unir.')
+        return redirect('talhao_list')
+
+    talhoes = Talhao.objects.filter(id__in=talhao_ids, usuario=request.user)
+    
+    if talhoes.count() != len(talhao_ids):
+        messages.error(request, 'Talhões inválidos ou não pertencem a você.')
+        return redirect('talhao_list')
+
+    # Validação de plantios ativos
+    if Plantio.objects.filter(talhao__in=talhoes, status__in=['ATIVO', 'PREPARO', 'COLHEITA']).exists():
+        messages.error(request, 'Não é possível unir talhões que possuem plantios ativos. Finalize-os primeiro.')
+        return redirect('talhao_list')
+
+    try:
+        with transaction.atomic():
+            area_total = sum(t.area_m2 for t in talhoes)
+            
+            # --- Merge de Coordenadas (GeoJSON MultiPolygon) ---
+            import json
+            multipolygon_coords = []
+            for t in talhoes:
+                if t.coordenadas:
+                    try:
+                        coord_dict = t.coordenadas if isinstance(t.coordenadas, dict) else json.loads(t.coordenadas)
+                        geom = coord_dict.get('geometry') if coord_dict.get('type') == 'Feature' else coord_dict
+                        
+                        geom_type = geom.get('type')
+                        coords = geom.get('coordinates', [])
+                        
+                        if geom_type == 'Polygon':
+                            multipolygon_coords.append(coords)
+                        elif geom_type == 'MultiPolygon':
+                            multipolygon_coords.extend(coords)
+                    except Exception:
+                        pass
+            
+            merged_geojson = None
+            if multipolygon_coords:
+                merged_geojson = {
+                    "type": "Feature",
+                    "geometry": {
+                        "type": "MultiPolygon",
+                        "coordinates": multipolygon_coords
+                    },
+                    "properties": {}
+                }
+            # ----------------------------------------------------
+
+            # 1. Instanciar novo e forçar request.user
+            novo_talhao = Talhao(
+                nome=novo_nome,
+                area_m2=area_total,
+                tipo_solo=tipo_solo,
+                observacoes=observacoes,
+                coordenadas=merged_geojson
+            )
+            novo_talhao.usuario = request.user
+            
+            # 2. Salvar para gerar o ID ANTES de reatribuir
+            novo_talhao.save()
+            
+            # 3. Transferir plantios históricos (Mantém Manejos e Irrigações)
+            Plantio.objects.filter(talhao__in=talhoes).update(talhao=novo_talhao)
+            
+            # 4. Deletar (ou inativar) talhões originais
+            talhoes.delete()
+            
+            messages.success(request, f'Sucesso: "{novo_nome}" criado com {area_total} m² e todo histórico preservado.')
+            
+    except Exception as e:
+        messages.error(request, f'Falha ao mesclar talhões no banco de dados: {str(e)}')
+
+    return redirect('talhao_list')
+
+@login_required
+@require_POST
+def dividir_talhao(request, pk):
+    talhao = get_object_or_404(Talhao, pk=pk, usuario=request.user)
+    
+    nomes = request.POST.getlist('fracao_nome[]')
+    areas = request.POST.getlist('fracao_area[]')
+    
+    if not nomes or not areas or len(nomes) != len(areas) or len(nomes) < 2:
+        messages.error(request, 'Dados de fracionamento inválidos. Informe pelo menos 2 frações.')
+        return redirect('talhao_list')
+
+    try:
+        areas_decimal = [Decimal(a) for a in areas]
+    except Exception:
+        messages.error(request, 'Valores de área inválidos.')
+        return redirect('talhao_list')
+
+    if sum(areas_decimal) != talhao.area_m2:
+        messages.error(request, 'A soma das áreas das frações deve ser exatamente igual à área original do talhão.')
+        return redirect('talhao_list')
+
+    with transaction.atomic():
+        for nome, area in zip(nomes, areas_decimal):
+            Talhao.objects.create(
+                usuario=request.user,
+                nome=nome,
+                area_m2=area,
+                tipo_solo=talhao.tipo_solo,
+                coordenadas=talhao.coordenadas
+            )
+        talhao.delete()
+        messages.success(request, 'Talhão dividido com sucesso.')
+
+    return redirect('talhao_list')
+
+@login_required
+@require_POST
+def dividir_talhao_mapa(request):
+    talhao_id = request.POST.get('talhao_id')
+    nomes = request.POST.getlist('corte_nomes[]')
+    areas = request.POST.getlist('corte_areas[]')
+    geojsons = request.POST.getlist('corte_geojsons[]')
+    
+    if not talhao_id or not nomes or len(nomes) < 2:
+        messages.error(request, 'Dados de corte inválidos.')
+        return redirect('talhao_list')
+        
+    talhao = get_object_or_404(Talhao, pk=talhao_id, usuario=request.user)
+    
+    try:
+        with transaction.atomic():
+            for nome, area, geojson in zip(nomes, areas, geojsons):
+                novo = Talhao.objects.create(
+                    usuario=request.user,
+                    nome=nome,
+                    area_m2=Decimal(area),
+                    tipo_solo=talhao.tipo_solo,
+                    coordenadas=geojson
+                )
+            
+            # Atualizar os plantios para a primeira fração (ou deixá-los atrelados ao que sobrou, mas aqui excluímos o pai)
+            # Como o corte substitui a área pai, plantios devem ser finalizados ou reatribuídos.
+            # Se for reatribuir, atribuímos ao maior ou ao primeiro. Por segurança, apenas transferimos para o primeiro pedaço.
+            primeiro_novo = Talhao.objects.filter(usuario=request.user, nome=nomes[0]).last()
+            Plantio.objects.filter(talhao=talhao).update(talhao=primeiro_novo)
+            
+            talhao.delete()
+            messages.success(request, f'Talhão cortado visualmente em {len(nomes)} partes com sucesso!')
+            
+    except Exception as e:
+        messages.error(request, f'Falha ao processar o corte geográfico: {str(e)}')
+
+    return redirect('talhao_list')
+
 # Plantio Views
 class PlantioListView(LoginRequiredMixin, ListView):
     model = Plantio

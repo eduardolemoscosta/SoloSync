@@ -10,6 +10,10 @@ urlpatterns = [
     path('talhoes/<int:pk>/editar/', views.TalhaoUpdateView.as_view(), name='talhao_update'),
     path('talhoes/<int:pk>/excluir/', views.TalhaoDeleteView.as_view(), name='talhao_delete'),
     
+    path('talhoes/unir/', views.unir_talhoes, name='talhoes_unir'),
+    path('talhoes/<int:pk>/dividir/', views.dividir_talhao, name='talhoes_dividir'),
+    path('talhoes/dividir-mapa/', views.dividir_talhao_mapa, name='dividir_talhao_mapa'),
+    
     path('plantios/', views.PlantioListView.as_view(), name='plantio_list'),
     path('plantios/novo/', views.PlantioCreateView.as_view(), name='plantio_create'),
     path('plantios/<int:pk>/', views.PlantioDetailView.as_view(), name='plantio_detail'),

@@ -32,6 +32,29 @@ class PlantioForm(forms.ModelForm):
         if user:
             self.fields['talhao'].queryset = Talhao.objects.filter(usuario=user)
 
+    def clean(self):
+        cleaned_data = super().clean()
+        status = cleaned_data.get('status')
+        cultura = cleaned_data.get('cultura')
+        data_plantio = cleaned_data.get('data_plantio')
+        ciclo = cleaned_data.get('ciclo_dias_estimado')
+
+        if status == 'PREPARO':
+            # Limpa valores padrão ou mantem como "Preparo de Solo"
+            cleaned_data['cultura'] = cultura or "Preparo de Solo"
+            cleaned_data['variedade'] = ""
+            cleaned_data['data_plantio'] = None
+            cleaned_data['ciclo_dias_estimado'] = 0
+        else:
+            if not cultura or cultura == "Preparo de Solo":
+                self.add_error('cultura', 'Cultura é obrigatória quando o status não for Preparo.')
+            if not data_plantio:
+                self.add_error('data_plantio', 'Data de Plantio é obrigatória.')
+            if ciclo is None or ciclo <= 0:
+                self.add_error('ciclo_dias_estimado', 'Ciclo estimado é obrigatório.')
+
+        return cleaned_data
+
 class ManejoForm(forms.ModelForm):
     class Meta:
         model = Manejo

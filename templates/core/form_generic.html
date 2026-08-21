@@ -41,4 +41,33 @@
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const statusSelect = document.getElementById('id_status');
+    const cultura = document.getElementById('id_cultura');
+    const variedade = document.getElementById('id_variedade');
+    const dataPlantio = document.getElementById('id_data_plantio');
+    const cicloDias = document.getElementById('id_ciclo_dias_estimado');
+
+    // Verifica se estamos no formulário de Plantio
+    if (statusSelect && cultura && dataPlantio) {
+        // Seleciona as divs containers dos campos (.mb-3)
+        const camposAgronomicos = [cultura, variedade, dataPlantio, cicloDias].map(el => el ? el.closest('.mb-3') : null);
+
+        function atualizarVisibilidadeCampos() {
+            const valorStatus = statusSelect.value;
+            camposAgronomicos.forEach(container => {
+                if(container) {
+                    // Oculta os containers se for preparo, senão exibe
+                    container.style.display = (valorStatus === 'PREPARO') ? 'none' : 'block';
+                }
+            });
+        }
+
+        atualizarVisibilidadeCampos();
+        statusSelect.addEventListener('change', atualizarVisibilidadeCampos);
+    }
+});
+</script>
 {% endblock %}

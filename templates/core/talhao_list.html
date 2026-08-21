@@ -3,62 +3,163 @@
 {% block content %}
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
     <h2>Meus Talhões</h2>
-    <a href="{% url 'talhao_create' %}" class="btn btn-success"><i class="bi bi-plus-lg"></i> Novo Talhão</a>
+    <div>
+        <button type="button" class="btn btn-warning me-2" id="btn-unir" data-bs-toggle="modal" data-bs-target="#modalUnir" disabled>
+            <i class="bi bi-intersect"></i> Unir Selecionados
+        </button>
+        <a href="{% url 'talhao_create' %}" class="btn btn-success"><i class="bi bi-plus-lg"></i> Novo Talhão</a>
+    </div>
 </div>
 
-<!-- Leaflet CSS -->
+<!-- Leaflet CSS & Geoman CSS -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.css" />
 <style>
     #mapAll { height: 350px; width: 100%; border-radius: 5px; margin-bottom: 20px; border: 1px solid #ccc; z-index: 1;}
 </style>
 
 <div class="card shadow-sm mb-4">
-    <div class="card-header bg-success text-white">
-        <h5 class="mb-0"><i class="bi bi-map"></i> Visão Geral das Áreas</h5>
+    <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="bi bi-map"></i> Visão Geral e Corte Rápido</h5>
+        <small>Use o ícone da tesoura no mapa para cortar um talhão</small>
     </div>
     <div class="card-body p-1">
         <div id="mapAll"></div>
     </div>
 </div>
 
-<div class="table-responsive">
-    <table class="table table-hover">
-        <thead class="table-light">
-            <tr>
-                <th>Nome</th>
-                <th>Área (m²)</th>
-                <th>Tipo de Solo</th>
-                <th>Ações</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for talhao in talhoes %}
-            <tr>
-                <td>{{ talhao.nome }}</td>
-                <td>{{ talhao.area_m2 }}</td>
-                <td>{{ talhao.tipo_solo }}</td>
-                <td>
-                    <a href="{% url 'talhao_update' talhao.id %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil"></i> Editar</a>
-                    <a href="{% url 'talhao_delete' talhao.id %}" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i> Excluir</a>
-                </td>
-            </tr>
-            {% empty %}
-            <tr>
-                <td colspan="4" class="text-center">Nenhum talhão cadastrado.</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+<form id="form-unir" method="post" action="{% url 'talhoes_unir' %}">
+    {% csrf_token %}
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th style="width: 40px;"><input class="form-check-input" type="checkbox" id="checkAll"></th>
+                    <th>Nome</th>
+                    <th>Área (m²)</th>
+                    <th>Tipo de Solo</th>
+                    <th class="text-end">Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for talhao in talhoes %}
+                <tr>
+                    <td><input class="form-check-input talhao-check" type="checkbox" name="talhoes_ids" value="{{ talhao.id }}" data-area="{{ talhao.area_m2|stringformat:'f' }}"></td>
+                    <td>{{ talhao.nome }}</td>
+                    <td>{{ talhao.area_m2 }}</td>
+                    <td>{{ talhao.tipo_solo }}</td>
+                    <td class="text-end">
+                        <button type="button" class="btn btn-sm btn-outline-primary btn-dividir" 
+                                data-id="{{ talhao.id }}" 
+                                data-nome="{{ talhao.nome }}" 
+                                data-area="{{ talhao.area_m2|stringformat:'f' }}">
+                            <i class="bi bi-layout-split"></i> Dividir
+                        </button>
+                        <a href="{% url 'talhao_update' talhao.id %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil"></i></a>
+                        <a href="{% url 'talhao_delete' talhao.id %}" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" class="text-center">Nenhum talhão cadastrado.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Modal Unir -->
+    <div class="modal fade" id="modalUnir" tabindex="-1">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header bg-warning">
+            <h5 class="modal-title">Unir Talhões</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <p>A área total resultante será de: <strong id="area-unida-preview">0</strong> m²</p>
+            <div class="mb-3">
+                <label class="form-label">Nome do novo talhão resultante</label>
+                <input type="text" name="novo_nome" class="form-control" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Tipo de Solo Predominante</label>
+                <input type="text" name="tipo_solo" class="form-control" value="Misto">
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Observações</label>
+                <textarea name="observacoes" class="form-control" rows="2"></textarea>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+            <button type="submit" class="btn btn-warning">Confirmar União</button>
+          </div>
+        </div>
+      </div>
+    </div>
+</form>
+
+<!-- Modal Dividir -->
+<div class="modal fade" id="modalDividir" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form id="form-dividir" method="post" action="">
+          {% csrf_token %}
+          <input type="hidden" name="talhao_id" id="dividir_talhao_id">
+          
+          <div class="modal-header bg-primary text-white">
+            <h5 class="modal-title">Fracionar Talhão: <span id="dividir-nome-preview"></span></h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <button type="button" class="btn btn-warning w-100 mb-3" id="btn-cortar-mapa">
+                <i class="bi bi-scissors"></i> Cortar no Mapa (Faca/Tesoura)
+            </button>
+            <p>Área Original: <strong id="dividir-area-preview">0</strong> m²</p>
+            
+            <div id="fracoes-container">
+                <!-- Fração 1 -->
+                <div class="row mb-2 fracao-row">
+                    <div class="col-7"><input type="text" name="fracao_nome[]" class="form-control" placeholder="Nome Fração 1" required></div>
+                    <div class="col-5"><input type="number" step="0.01" name="fracao_area[]" class="form-control fracao-area-input" placeholder="Área m²" required></div>
+                </div>
+                <!-- Fração 2 -->
+                <div class="row mb-2 fracao-row">
+                    <div class="col-7"><input type="text" name="fracao_nome[]" class="form-control" placeholder="Nome Fração 2" required></div>
+                    <div class="col-5"><input type="number" step="0.01" name="fracao_area[]" class="form-control fracao-area-input" placeholder="Área m²" required></div>
+                </div>
+            </div>
+            
+            <button type="button" class="btn btn-sm btn-outline-secondary mt-2" id="btn-add-fracao">+ Adicionar Fração</button>
+            
+            <div class="alert alert-info mt-3 py-2">
+                Soma atual: <strong id="soma-atual">0</strong> m²
+            </div>
+            
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+            <button type="submit" class="btn btn-primary" id="btn-submit-dividir" disabled>Confirmar Divisão</button>
+          </div>
+      </form>
+    </div>
+  </div>
 </div>
 
-<!-- Leaflet JS -->
+<!-- Scripts -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/@turf/turf/turf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/polygon-clipping@0.15.3/dist/polygon-clipping.umd.min.js"></script>
+<script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.js"></script>
 <script>
     document.addEventListener("DOMContentLoaded", function() {
         var map = L.map('mapAll').setView([-6.1597, -35.6022], 14);
         
-        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-            attribution: 'Tiles &copy; Esri'
+        L.tileLayer('https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+            maxZoom: 20,
+            subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+            attribution: '&copy; Google Maps'
         }).addTo(map);
 
         var talhoes = [];
@@ -76,8 +177,19 @@
                         var parsed = typeof t.geojson === 'string' ? JSON.parse(t.geojson) : t.geojson;
                         if(parsed && Object.keys(parsed).length > 0) {
                             var layer = L.geoJSON(parsed, {
-                                style: { color: '#00ff00', weight: 2, fillOpacity: 0.3 }
+                                style: { color: '#00ff00', weight: 2, fillOpacity: 0.3 },
+                                coordsToLatLng: function(coords) {
+                                    if (coords[0] > -30 && coords[1] < -30) {
+                                        return new L.LatLng(coords[0], coords[1]);
+                                    }
+                                    return new L.LatLng(coords[1], coords[0]);
+                                }
                             });
+                            
+                            layer.eachLayer(function(l) {
+                                l.talhaoId = t.id;
+                            });
+                            
                             layer.bindPopup('<b>' + t.nome + '</b><br>Área: ' + t.area + ' m²');
                             allItems.addLayer(layer);
                         }
@@ -90,6 +202,321 @@
                 map.fitBounds(allItems.getBounds(), {padding: [20, 20]});
             }
         }
+        
+        // --- Lógica de Corte Integrada ao Modal ---
+        map.pm.addControls({
+            position: 'topleft',
+            drawMarker: false, drawCircleMarker: false, drawPolyline: false,
+            drawRectangle: false, drawPolygon: false, drawCircle: false, drawText: false,
+            editMode: false, dragMode: false, removalMode: false, cutPolygon: false
+        });
+        
+        // Habilita Snapping magnético suave (opcional para o usuário)
+        map.pm.setPathOptions({
+            snappable: true,
+            snapDistance: 15,
+            allowSelfIntersection: false
+        });
+        
+        var tempCutLayers = new L.FeatureGroup();
+        map.addLayer(tempCutLayers);
+        
+        let targetLayerToCut = null;
+        let isCuttingMode = false;
+
+        function setPolygonsInteractive(interactive) {
+            allItems.eachLayer(function(groupLayer) {
+                groupLayer.eachLayer(function(layer) {
+                    if (layer.getElement()) {
+                        layer.getElement().style.pointerEvents = interactive ? 'auto' : 'none';
+                    }
+                });
+            });
+        }
+
+        // Função para cancelar o modo de corte
+        function cancelarCorte() {
+            if (isCuttingMode) {
+                isCuttingMode = false;
+                map.pm.disableDraw();
+                setPolygonsInteractive(true);
+                var toast = document.getElementById('corte-toast');
+                if (toast) toast.remove();
+                modalDividir.show();
+            }
+        }
+
+        // Tecla ESC para cancelar
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') cancelarCorte();
+        });
+
+        document.getElementById('btn-cortar-mapa').addEventListener('click', function() {
+            var talhaoId = document.getElementById('dividir_talhao_id').value;
+            if(!talhaoId) return;
+            
+            targetLayerToCut = null;
+            allItems.eachLayer(function(groupLayer) {
+                groupLayer.eachLayer(function(l) {
+                    if (l.talhaoId == talhaoId) targetLayerToCut = l;
+                });
+            });
+            
+            if (!targetLayerToCut) {
+                alert("Talhão não encontrado no mapa.");
+                return;
+            }
+            
+            modalDividir.hide();
+            isCuttingMode = true;
+            
+            // Desativa cliques nos polígonos para não roubar o evento da tesoura
+            setPolygonsInteractive(false);
+            
+            // Ativa desenho de linha com parâmetros fluidos
+            map.pm.enableDraw('Line', { 
+                snappable: true, 
+                snapDistance: 12,
+                allowSelfIntersection: false,
+                templineStyle: { color: '#dc3545', dashArray: '5, 5' },
+                hintlineStyle: { color: '#dc3545', dashArray: '5, 5' },
+                finishOn: 'dblclick',
+                cursorMarker: true 
+            });
+            
+            map.fitBounds(targetLayerToCut.getBounds(), {padding: [50, 50]});
+            
+            var toast = document.createElement('div');
+            toast.id = "corte-toast";
+            toast.className = "position-fixed top-0 start-50 translate-middle-x mt-3 p-3 bg-warning fw-bold rounded shadow text-center";
+            toast.style.zIndex = 9999;
+            toast.innerHTML = "Clique livremente para desenhar a linha de corte.<br><small>Finalize com duplo-clique no último ponto. Pressione ESC para cancelar.</small>";
+            document.body.appendChild(toast);
+        });
+
+        // Função para estender a linha desenhada nas pontas, garantindo que atravesse a borda do polígono caso o usuário use Snap exato
+        function estenderLinha(lineGeoJSON, distanciaMetros) {
+            var coords = lineGeoJSON.geometry.coordinates;
+            if (coords.length < 2) return lineGeoJSON;
+            
+            var p0 = turf.point(coords[0]);
+            var p1 = turf.point(coords[1]);
+            var bearingStart = turf.bearing(p1, p0);
+            var newStart = turf.destination(p0, distanciaMetros / 1000, bearingStart).geometry.coordinates;
+            
+            var pLast = turf.point(coords[coords.length - 1]);
+            var pPrev = turf.point(coords[coords.length - 2]);
+            var bearingEnd = turf.bearing(pPrev, pLast);
+            var newEnd = turf.destination(pLast, distanciaMetros / 1000, bearingEnd).geometry.coordinates;
+            
+            return turf.lineString([newStart, ...coords, newEnd]);
+        }
+
+        map.on('pm:create', function(e) {
+            if (e.shape === 'Line' && isCuttingMode && targetLayerToCut) {
+                isCuttingMode = false;
+                setPolygonsInteractive(true);
+                
+                var linhaCorteLayer = e.layer;
+                var linhaGeoJSON = linhaCorteLayer.toGeoJSON();
+                
+                linhaCorteLayer.remove(); // Limpa linha temporária
+                
+                var toast = document.getElementById('corte-toast');
+                if (toast) toast.remove();
+
+                var polyGeoJSON = targetLayerToCut.toGeoJSON();
+                
+                // Validação de cruzamento: os pontos inicial e final devem estar fora ou exatamente na borda do polígono.
+                // O interior da linha deve estar dentro.
+                var intersecta = turf.booleanIntersects(linhaGeoJSON, polyGeoJSON);
+                if (!intersecta) {
+                    alert("A linha não tocou o talhão.");
+                    modalDividir.show();
+                    return;
+                }
+
+                // Estende a linha virtualmente em 10.000 metros (10 km) nas duas pontas para ter certeza absoluta 
+                // que vai atravessar a propriedade toda, independentemente de onde o usuário clicou (meio, borda ou fora).
+                var linhaEstendida = estenderLinha(linhaGeoJSON, 10000);
+                
+                // Cria a lâmina de corte com Turf (1 cm de espessura)
+                var laminaCorte = turf.buffer(linhaEstendida, 0.01, {units: 'meters'});
+                
+                try {
+                    var polyCoords = polyGeoJSON.geometry.coordinates;
+                    if (polyGeoJSON.geometry.type === 'Polygon') polyCoords = [polyCoords];
+                    var laminaCoords = laminaCorte.geometry.coordinates;
+                    if (laminaCorte.geometry.type === 'Polygon') laminaCoords = [laminaCoords];
+                    
+                    // Diferença via polygon-clipping
+                    var diffCoords = polygonClipping.difference(polyCoords, laminaCoords);
+                    
+                    if (diffCoords && diffCoords.length > 1) {
+                        processarCorteNoModal(targetLayerToCut, diffCoords);
+                    } else {
+                        alert("Trace uma linha contínua que atravesse a área a ser dividida.");
+                        modalDividir.show();
+                    }
+                } catch (err) {
+                    alert("Trace uma linha contínua que atravesse a área a ser dividida.");
+                    modalDividir.show();
+                }
+            }
+        });
+        
+        function processarCorteNoModal(originalLayer, diffCoordsArray) {
+            tempCutLayers.clearLayers();
+            originalLayer.removeFrom(map); // Esconde temporariamente
+            
+            var cores = ['#ff0000', '#0000ff', '#ff00ff', '#00ffff', '#ffff00'];
+            
+            // Muda a Action do Formulário para a View que suporta GeoJSON!
+            formDividir.action = '/talhoes/dividir-mapa/';
+            
+            // Limpa o container
+            fracoesContainer.innerHTML = '';
+            
+            diffCoordsArray.forEach(function(polygonCoords, index) {
+                var feature = turf.polygon(polygonCoords);
+                var areaSqMeters = turf.area(feature);
+                var idx = index + 1;
+                
+                // Exibe no mapa
+                var layer = L.geoJSON(feature, {
+                    style: { color: cores[index % cores.length], fillOpacity: 0.6 },
+                    coordsToLatLng: function(coords) { return new L.LatLng(coords[1], coords[0]); }
+                });
+                tempCutLayers.addLayer(layer);
+                
+                // Cria inputs dinâmicos
+                var div = document.createElement('div');
+                div.className = 'row mb-2 fracao-row';
+                div.innerHTML = `
+                    <div class="col-7">
+                        <input type="text" name="corte_nomes[]" class="form-control" placeholder="Nome Fração ${idx}" required>
+                    </div>
+                    <div class="col-5">
+                        <input type="number" step="0.01" name="corte_areas[]" class="form-control fracao-area-input" value="${areaSqMeters.toFixed(2)}" readonly>
+                        <input type="hidden" name="corte_geojsons[]" value='${JSON.stringify(feature)}'>
+                    </div>
+                `;
+                fracoesContainer.appendChild(div);
+            });
+            
+            // Desabilita botão "Adicionar Fração" pois o corte já definiu as partes fixas
+            btnAddFracao.style.display = 'none';
+            document.querySelector('#soma-atual').parentElement.style.display = 'none'; // esconde alerta de soma
+            
+            btnSubmitDividir.disabled = false;
+            modalDividir.show();
+        }
+        // ------------------------
+
+        // --- Lógica de União (Unir) ---
+        const checks = document.querySelectorAll('.talhao-check');
+        const checkAll = document.getElementById('checkAll');
+        const btnUnir = document.getElementById('btn-unir');
+        const areaUnidaPreview = document.getElementById('area-unida-preview');
+
+        function updateUnir() {
+            let count = 0;
+            let areaSum = 0;
+            checks.forEach(c => {
+                if (c.checked) {
+                    count++;
+                    let val = parseFloat(c.getAttribute('data-area').replace(',', '.'));
+                    if (!isNaN(val)) areaSum += val;
+                }
+            });
+            btnUnir.disabled = count < 2;
+            areaUnidaPreview.textContent = areaSum.toFixed(2);
+        }
+
+        if (checkAll) {
+            checkAll.addEventListener('change', e => {
+                checks.forEach(c => c.checked = e.target.checked);
+                updateUnir();
+            });
+        }
+        checks.forEach(c => c.addEventListener('change', updateUnir));
+
+        // --- Lógica de Divisão (Fracionar) ---
+        const modalDividir = new bootstrap.Modal(document.getElementById('modalDividir'));
+        const formDividir = document.getElementById('form-dividir');
+        const dividirNomePreview = document.getElementById('dividir-nome-preview');
+        const dividirAreaPreview = document.getElementById('dividir-area-preview');
+        const somaAtual = document.getElementById('soma-atual');
+        const btnSubmitDividir = document.getElementById('btn-submit-dividir');
+        const fracoesContainer = document.getElementById('fracoes-container');
+        const btnAddFracao = document.getElementById('btn-add-fracao');
+
+        let currentAreaOriginal = 0;
+
+        document.querySelectorAll('.btn-dividir').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const id = this.getAttribute('data-id');
+                const nome = this.getAttribute('data-nome');
+                currentAreaOriginal = parseFloat(this.getAttribute('data-area').replace(',', '.'));
+                
+                document.getElementById('dividir_talhao_id').value = id;
+                dividirNomePreview.textContent = nome;
+                dividirAreaPreview.textContent = currentAreaOriginal.toFixed(2);
+                
+                formDividir.action = `/talhoes/${id}/dividir/`;
+                
+                // Reseta inputs
+                document.querySelectorAll('.fracao-area-input').forEach(inp => inp.value = '');
+                updateSomaDivisao();
+                
+                modalDividir.show();
+            });
+        });
+
+        function updateSomaDivisao() {
+            let sum = 0;
+            document.querySelectorAll('.fracao-area-input').forEach(inp => {
+                let v = parseFloat(inp.value);
+                if (!isNaN(v)) sum += v;
+            });
+            somaAtual.textContent = sum.toFixed(2);
+            
+            // Margem de erro de 0.01 por conta de float
+            if (Math.abs(sum - currentAreaOriginal) < 0.01) {
+                btnSubmitDividir.disabled = false;
+                somaAtual.classList.remove('text-danger');
+                somaAtual.classList.add('text-success');
+            } else {
+                btnSubmitDividir.disabled = true;
+                somaAtual.classList.remove('text-success');
+                somaAtual.classList.add('text-danger');
+            }
+        }
+
+        fracoesContainer.addEventListener('input', function(e) {
+            if (e.target.classList.contains('fracao-area-input')) {
+                updateSomaDivisao();
+            }
+        });
+
+        btnAddFracao.addEventListener('click', function() {
+            const row = document.createElement('div');
+            row.className = 'row mb-2 fracao-row';
+            const c = fracoesContainer.querySelectorAll('.fracao-row').length + 1;
+            row.innerHTML = `
+                <div class="col-7"><input type="text" name="fracao_nome[]" class="form-control" placeholder="Nome Fração ${c}" required></div>
+                <div class="col-4"><input type="number" step="0.01" name="fracao_area[]" class="form-control fracao-area-input" placeholder="Área" required></div>
+                <div class="col-1"><button type="button" class="btn btn-sm btn-danger btn-remove-fracao"><i class="bi bi-x"></i></button></div>
+            `;
+            fracoesContainer.appendChild(row);
+        });
+
+        fracoesContainer.addEventListener('click', function(e) {
+            if (e.target.closest('.btn-remove-fracao')) {
+                e.target.closest('.fracao-row').remove();
+                updateSomaDivisao();
+            }
+        });
     });
 </script>
 {% endblock %}

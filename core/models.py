@@ -31,10 +31,10 @@ class Plantio(models.Model):
     ]
 
     talhao = models.ForeignKey(Talhao, on_delete=models.CASCADE, related_name='plantios')
-    cultura = models.CharField(max_length=100)
+    cultura = models.CharField(max_length=100, blank=True, null=True, default="Preparo de Solo")
     variedade = models.CharField(max_length=100, blank=True, null=True)
     data_plantio = models.DateField(blank=True, null=True)
-    ciclo_dias_estimado = models.PositiveIntegerField('Ciclo (dias)')
+    ciclo_dias_estimado = models.PositiveIntegerField('Ciclo (dias)', blank=True, null=True, default=0)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PREPARO')
 
     def data_prevista_colheita(self):
