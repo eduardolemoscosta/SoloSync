@@ -92,6 +92,26 @@ class PlantioListView(LoginRequiredMixin, ListView):
     context_object_name = 'plantios'
     def get_queryset(self):
         return Plantio.objects.filter(talhao__usuario=self.request.user)
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        import json
+        plantios_data = []
+        for p in context['plantios']:
+            if p.talhao.coordenadas:
+                status_dias = "Pronto para colheita" if p.dias_restantes() <= 0 else f"Faltam {p.dias_restantes()} dias (Dia {p.dias_passados()} de {p.ciclo_dias_estimado})"
+                plantios_data.append({
+                    'id': p.id,
+                    'cultura': p.cultura,
+                    'status': p.get_status_display(),
+                    'talhao': p.talhao.nome,
+                    'variedade': p.variedade or "Não informada",
+                    'data_plantio': p.data_plantio.strftime('%d/%m/%Y') if p.data_plantio else "Não definido",
+                    'ciclo': p.ciclo_dias_estimado,
+                    'status_dias': status_dias,
+                    'geojson': p.talhao.coordenadas
+                })
+        context['plantios_json'] = json.dumps(plantios_data)
+        return context
 
 class PlantioDetailView(LoginRequiredMixin, DetailView):
     model = Plantio

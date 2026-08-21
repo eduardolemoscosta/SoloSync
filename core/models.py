@@ -48,6 +48,15 @@ class Plantio(models.Model):
             return max(0, delta.days)
         return 0
 
+    def dias_passados(self):
+        return self.dias_decorridos()
+
+    def dias_restantes(self):
+        if not self.data_plantio or not self.ciclo_dias_estimado:
+            return 0
+        restantes = self.ciclo_dias_estimado - self.dias_passados()
+        return max(0, restantes)
+
     def progresso_ciclo_porcentagem(self):
         if not self.data_plantio or not self.ciclo_dias_estimado:
             return 0
@@ -55,6 +64,9 @@ class Plantio(models.Model):
         if decorridos >= self.ciclo_dias_estimado:
             return 100
         return int((decorridos / self.ciclo_dias_estimado) * 100)
+
+    def porcentagem_progresso(self):
+        return self.progresso_ciclo_porcentagem()
 
     def __str__(self):
         return f"{self.cultura} - {self.talhao.nome} ({self.get_status_display()})"

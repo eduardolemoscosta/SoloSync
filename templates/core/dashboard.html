@@ -55,8 +55,18 @@
                 <td><span class="badge bg-secondary">{{ p.get_status_display }}</span></td>
                 <td>{{ p.dias_decorridos }} / {{ p.ciclo_dias_estimado }}</td>
                 <td>
-                    <div class="progress" style="height: 20px;">
-                        <div class="progress-bar {% if p.progresso_ciclo_porcentagem > 80 %}bg-success{% else %}bg-primary{% endif %}" role="progressbar" style="width: {{ p.progresso_ciclo_porcentagem }}%;" aria-valuenow="{{ p.progresso_ciclo_porcentagem }}" aria-valuemin="0" aria-valuemax="100">{{ p.progresso_ciclo_porcentagem }}%</div>
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <small class="text-muted fw-bold">
+                            {% if p.dias_restantes <= 0 %}
+                                <span class="text-success"><i class="bi bi-check-circle-fill"></i> Pronto</span>
+                            {% else %}
+                                Faltam {{ p.dias_restantes }} dias
+                            {% endif %}
+                        </small>
+                        <small class="text-muted">{{ p.porcentagem_progresso }}%</small>
+                    </div>
+                    <div class="progress" style="height: 15px;">
+                        <div class="progress-bar {% if p.porcentagem_progresso >= 100 %}bg-success{% else %}bg-primary{% endif %}" role="progressbar" style="width: {{ p.porcentagem_progresso }}%;" aria-valuenow="{{ p.porcentagem_progresso }}" aria-valuemin="0" aria-valuemax="100"></div>
                     </div>
                 </td>
                 <td>

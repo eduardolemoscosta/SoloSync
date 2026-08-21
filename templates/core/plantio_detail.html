@@ -19,9 +19,19 @@
                 <p><strong>Data Plantio:</strong> {{ plantio.data_plantio|default:"Não definido" }}</p>
                 <p><strong>Previsão Colheita:</strong> {{ plantio.data_prevista_colheita|default:"-" }}</p>
                 <hr>
-                <p class="mb-1"><strong>Progresso:</strong> {{ plantio.progresso_ciclo_porcentagem }}%</p>
-                <div class="progress" style="height: 10px;">
-                    <div class="progress-bar bg-success" role="progressbar" style="width: {{ plantio.progresso_ciclo_porcentagem }}%;"></div>
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <strong>Progresso:</strong>
+                    <small class="text-muted fw-bold">
+                        {% if plantio.dias_restantes <= 0 %}
+                            <span class="text-success"><i class="bi bi-check-circle-fill"></i> Pronto para colheita</span>
+                        {% else %}
+                            Faltam {{ plantio.dias_restantes }} dias
+                        {% endif %}
+                        ({{ plantio.porcentagem_progresso }}%)
+                    </small>
+                </div>
+                <div class="progress" style="height: 15px;">
+                    <div class="progress-bar {% if plantio.porcentagem_progresso >= 100 %}bg-success{% else %}bg-primary{% endif %}" role="progressbar" style="width: {{ plantio.porcentagem_progresso }}%;"></div>
                 </div>
             </div>
         </div>

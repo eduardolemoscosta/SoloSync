@@ -6,6 +6,38 @@
     <a href="{% url 'plantio_create' %}" class="btn btn-success"><i class="bi bi-plus-lg"></i> Novo Plantio</a>
 </div>
 
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+    #mapPlantios { height: 400px; width: 100%; border-radius: 5px; margin-bottom: 20px; border: 1px solid #ccc; z-index: 1;}
+    .custom-tooltip {
+        padding: 8px;
+        font-size: 14px;
+        line-height: 1.5;
+        color: #333;
+        min-width: 200px;
+    }
+    .custom-tooltip h6 {
+        margin: 0 0 5px 0;
+        font-weight: bold;
+        color: #198754;
+        border-bottom: 1px solid #ddd;
+        padding-bottom: 5px;
+    }
+    .custom-tooltip p {
+        margin: 0;
+    }
+</style>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-success text-white">
+        <h5 class="mb-0"><i class="bi bi-map"></i> Mapa de Plantios</h5>
+    </div>
+    <div class="card-body p-1">
+        <div id="mapPlantios"></div>
+    </div>
+</div>
+
 <div class="row">
     {% for plantio in plantios %}
     <div class="col-md-6 col-lg-4 mb-4">
@@ -19,9 +51,18 @@
                 <p><strong>Variedade:</strong> {{ plantio.variedade|default:"Não informada" }}</p>
                 <p><strong>Plantio:</strong> {{ plantio.data_plantio|default:"Não definido" }}</p>
                 <p><strong>Ciclo:</strong> {{ plantio.ciclo_dias_estimado }} dias</p>
-                
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <small class="text-muted fw-bold">
+                        {% if plantio.dias_restantes <= 0 %}
+                            <span class="text-success"><i class="bi bi-check-circle-fill"></i> Pronto para colheita</span>
+                        {% else %}
+                            Faltam {{ plantio.dias_restantes }} dias (Dia {{ plantio.dias_passados }} de {{ plantio.ciclo_dias_estimado }})
+                        {% endif %}
+                    </small>
+                    <small class="text-muted">{{ plantio.porcentagem_progresso }}%</small>
+                </div>
                 <div class="progress mb-3" style="height: 15px;">
-                    <div class="progress-bar bg-success" role="progressbar" style="width: {{ plantio.progresso_ciclo_porcentagem }}%;"></div>
+                    <div class="progress-bar {% if plantio.porcentagem_progresso >= 100 %}bg-success{% else %}bg-primary{% endif %}" role="progressbar" style="width: {{ plantio.porcentagem_progresso }}%;"></div>
                 </div>
             </div>
             <div class="card-footer bg-white border-top-0 d-flex justify-content-between">
@@ -39,4 +80,73 @@
     </div>
     {% endfor %}
 </div>
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        var map = L.map('mapPlantios').setView([-6.1597, -35.6022], 14);
+        
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles &copy; Esri'
+        }).addTo(map);
+
+        var plantios = JSON.parse('{{ plantios_json|escapejs }}');
+        
+        if (plantios.length > 0) {
+            var allItems = new L.FeatureGroup();
+            var baseStyle = { color: '#00ff00', weight: 2, fillOpacity: 0.3 };
+            var hoverStyle = { color: '#ffff00', weight: 4, fillOpacity: 0.6 };
+            
+            plantios.forEach(function(p) {
+                if(p.geojson) {
+                    var parsed;
+                    if(typeof p.geojson === 'string') {
+                        try { parsed = JSON.parse(p.geojson); } catch(e) { parsed = null; }
+                    } else {
+                        parsed = p.geojson;
+                    }
+                    
+                    if(parsed) {
+                        var layer = L.geoJSON(parsed, { style: baseStyle });
+                        
+                        var tooltipContent = `
+                            <div class="custom-tooltip">
+                                <h6>${p.cultura} - <span class="badge bg-secondary">${p.status}</span></h6>
+                                <p><strong>Talhão:</strong> ${p.talhao}</p>
+                                <p><strong>Variedade:</strong> ${p.variedade}</p>
+                                <p><strong>Plantio:</strong> ${p.data_plantio} (${p.ciclo} dias)</p>
+                                <p><strong>Progresso:</strong> ${p.status_dias}</p>
+                            </div>
+                        `;
+                        
+                        layer.bindTooltip(tooltipContent, {
+                            sticky: true,
+                            className: 'bg-white',
+                            opacity: 0.95
+                        });
+                        
+                        layer.on('mouseover', function(e) {
+                            var targetLayer = e.target;
+                            targetLayer.setStyle(hoverStyle);
+                            targetLayer.bringToFront();
+                        });
+                        
+                        layer.on('mouseout', function(e) {
+                            var targetLayer = e.target;
+                            targetLayer.setStyle(baseStyle);
+                        });
+                        
+                        allItems.addLayer(layer);
+                    }
+                }
+            });
+            
+            if (allItems.getLayers().length > 0) {
+                map.addLayer(allItems);
+                map.fitBounds(allItems.getBounds(), {padding: [20, 20]});
+            }
+        }
+    });
+</script>
 {% endblock %}

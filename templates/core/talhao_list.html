@@ -55,7 +55,7 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
     document.addEventListener("DOMContentLoaded", function() {
-        var map = L.map('mapAll').setView([-14.235, -51.925], 4);
+        var map = L.map('mapAll').setView([-6.1597, -35.6022], 14);
         
         L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
             attribution: 'Tiles &copy; Esri'
@@ -88,11 +88,7 @@
             if (allItems.getLayers().length > 0) {
                 map.addLayer(allItems);
                 map.fitBounds(allItems.getBounds(), {padding: [20, 20]});
-            } else {
-                map.locate({setView: true, maxZoom: 10});
             }
-        } else {
-            map.locate({setView: true, maxZoom: 10});
         }
     });
 </script>
