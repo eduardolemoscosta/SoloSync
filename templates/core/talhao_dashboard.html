@@ -51,13 +51,16 @@
             <h2 class="h3 mb-0 d-inline align-middle">
                 <i class="bi bi-geo-alt-fill text-success"></i> {{ talhao.nome }}
             </h2>
-            <span class="badge {{ status_badge_class }} fs-6 ms-2 align-middle">{{ status_display }}</span>
+            <span class="badge bg-light text-dark border ms-2 align-middle">
+                <i class="bi bi-houses text-success"></i> {{ propriedade.nome }}
+            </span>
+            <span class="badge {{ status_badge_class }} fs-6 ms-1 align-middle">{{ status_display }}</span>
         </div>
 
         <!-- Dropdown Seletor de Talhão -->
         <div class="d-inline-block">
             <select class="form-select form-select-sm" onchange="if(this.value) window.location.href=this.value;" style="min-width: 200px;">
-                <option disabled>Alternar Talhão...</option>
+                <option disabled>Alternar Talhão na {{ propriedade.nome }}...</option>
                 {% for t in todos_talhoes %}
                     <option value="{% url 'talhao_dashboard' t.id %}" {% if t.id == talhao.id %}selected{% endif %}>
                         🌾 {{ t.nome }} ({{ t.area_m2 }} m²)
@@ -507,8 +510,8 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
     document.addEventListener("DOMContentLoaded", function() {
-        var defaultLat = {{ request.user.perfil.latitude_propriedade|stringformat:'f'|default:"-5.8958" }};
-        var defaultLng = {{ request.user.perfil.longitude_propriedade|stringformat:'f'|default:"-35.7633" }};
+        var defaultLat = {{ default_lat|stringformat:'f'|default:"-5.8958" }};
+        var defaultLng = {{ default_lng|stringformat:'f'|default:"-35.7633" }};
         var map = L.map('mapTalhao').setView([defaultLat, defaultLng], 14);
 
         // Satélite Google Maps

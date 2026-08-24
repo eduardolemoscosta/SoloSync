@@ -1,0 +1,153 @@
+{% extends 'index.html' %}
+
+{% block title %}Minhas Propriedades - Gestão Agrícola{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h2><i class="bi bi-houses-fill text-success me-2"></i>Minhas Propriedades / Terras</h2>
+    <div>
+        <a href="{% url 'propriedade_create' %}" class="btn btn-success">
+            <i class="bi bi-plus-lg"></i> Nova Propriedade
+        </a>
+    </div>
+</div>
+
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+    #mapPropriedades {
+        height: 350px;
+        width: 100%;
+        border-radius: 6px;
+        border: 1px solid #ccc;
+        z-index: 1;
+    }
+</style>
+
+{% if propriedades %}
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="bi bi-geo-alt"></i> Localização das Sedes</h5>
+        <small>Mapa de visualização das suas fazendas</small>
+    </div>
+    <div class="card-body p-1">
+        <div id="mapPropriedades"></div>
+    </div>
+</div>
+{% endif %}
+
+<div class="row g-4">
+    {% for prop in propriedades %}
+    <div class="col-md-6 col-lg-4">
+        <div class="card h-100 shadow-sm border-0 border-start border-4 border-success">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center pt-3">
+                <h5 class="mb-0 text-success fw-bold">
+                    <i class="bi bi-geo-fill"></i> {{ prop.nome }}
+                </h5>
+                <span class="badge bg-success bg-opacity-10 text-success fw-bold">
+                    {{ prop.total_talhoes }} {% if prop.total_talhoes == 1 %}talhão{% else %}talhões{% endif %}
+                </span>
+            </div>
+            <div class="card-body">
+                <p class="text-muted small mb-2">
+                    <i class="bi bi-pin-map"></i> 
+                    {% if prop.cidade or prop.estado %}
+                        {{ prop.cidade|default:"" }}{% if prop.cidade and prop.estado %} - {% endif %}{{ prop.estado|default:"" }}
+                    {% else %}
+                        Localização não informada
+                    {% endif %}
+                </p>
+                <div class="bg-light p-2 rounded mb-3">
+                    <div class="row text-center">
+                        <div class="col-6 border-end">
+                            <small class="text-muted d-block">Área Total</small>
+                            <strong>{{ prop.area_total_ha|default:"Não inf." }} ha</strong>
+                        </div>
+                        <div class="col-6">
+                            <small class="text-muted d-block">Coordenadas</small>
+                            <small class="text-truncate d-block" title="{{ prop.latitude_sede }}, {{ prop.longitude_sede }}">
+                                {{ prop.latitude_sede|floatformat:4 }}, {{ prop.longitude_sede|floatformat:4 }}
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer bg-white border-top-0 d-flex justify-content-between align-items-center pb-3">
+                <a href="{% url 'talhao_list' %}?propriedade={{ prop.id }}" class="btn btn-sm btn-outline-success">
+                    <i class="bi bi-grid-3x3"></i> Ver Talhões
+                </a>
+                <div>
+                    <a href="{% url 'propriedade_update' prop.id %}" class="btn btn-sm btn-outline-secondary me-1" title="Editar Propriedade">
+                        <i class="bi bi-pencil"></i>
+                    </a>
+                    <a href="{% url 'propriedade_delete' prop.id %}" class="btn btn-sm btn-outline-danger" title="Excluir Propriedade">
+                        <i class="bi bi-trash"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% empty %}
+    <div class="col-12">
+        <div class="alert alert-info text-center py-4">
+            <i class="bi bi-houses fs-1 d-block mb-2"></i>
+            <h5>Nenhuma propriedade cadastrada</h5>
+            <p class="text-muted mb-3">Cadastre sua primeira fazenda, sítio ou chácara para começar a gerenciar seus talhões.</p>
+            <a href="{% url 'propriedade_create' %}" class="btn btn-success">
+                <i class="bi bi-plus-lg"></i> Cadastrar Primeira Propriedade
+            </a>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Scripts Leaflet -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        var propriedades = [];
+        try {
+            var rawJson = '{{ propriedades_json|default:"[]"|escapejs }}';
+            if (rawJson) propriedades = JSON.parse(rawJson);
+        } catch(e) {
+            console.error("Erro ao processar JSON de propriedades:", e);
+        }
+
+        if (propriedades.length > 0) {
+            var map = L.map('mapPropriedades');
+            
+            L.tileLayer('https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+                maxZoom: 20,
+                subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+                attribution: '&copy; Google Maps'
+            }).addTo(map);
+
+            var bounds = [];
+            propriedades.forEach(function(p) {
+                if (p.lat && p.lng) {
+                    var marker = L.marker([p.lat, p.lng]).addTo(map);
+                    var popupContent = '<b>' + p.nome + '</b>';
+                    if (p.cidade || p.estado) {
+                        popupContent += '<br>' + p.cidade + (p.estado ? ' - ' + p.estado : '');
+                    }
+                    if (p.area_ha && p.area_ha !== '0') {
+                        popupContent += '<br>Área: ' + p.area_ha + ' ha';
+                    }
+                    popupContent += '<br><a href="/talhoes/?propriedade=' + p.id + '" class="btn btn-sm btn-success mt-2 py-0">Ver ' + p.talhoes_count + ' talhões</a>';
+                    
+                    marker.bindPopup(popupContent);
+                    bounds.push([p.lat, p.lng]);
+                }
+            });
+
+            if (bounds.length === 1) {
+                map.setView(bounds[0], 14);
+            } else if (bounds.length > 1) {
+                map.fitBounds(bounds, { padding: [40, 40] });
+            } else {
+                map.setView([-5.8958, -35.7633], 12);
+            }
+        }
+    });
+</script>
+{% endblock %}

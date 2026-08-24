@@ -8,27 +8,35 @@
 </div>
 
 <div class="row mb-4">
-    <div class="col-md-4 mb-3">
-        <div class="card text-bg-success">
+    <div class="col-md-3 mb-3">
+        <div class="card text-bg-secondary">
             <div class="card-body">
-                <h5 class="card-title"><i class="bi bi-play-circle"></i> Plantios Ativos</h5>
-                <h2 class="display-4">{{ plantios_ativos }}</h2>
+                <h6 class="card-title"><i class="bi bi-houses-fill"></i> Minhas Terras / Fazendas</h6>
+                <h2 class="display-5">{{ total_propriedades }}</h2>
             </div>
         </div>
     </div>
-    <div class="col-md-4 mb-3">
-        <div class="card text-bg-warning">
-            <div class="card-body">
-                <h5 class="card-title"><i class="bi bi-clock-history"></i> Áreas em Preparo</h5>
-                <h2 class="display-4">{{ areas_preparo }}</h2>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-4 mb-3">
+    <div class="col-md-3 mb-3">
         <div class="card text-bg-primary">
             <div class="card-body">
-                <h5 class="card-title"><i class="bi bi-geo-alt"></i> Total de Talhões</h5>
-                <h2 class="display-4">{{ total_talhoes }}</h2>
+                <h6 class="card-title"><i class="bi bi-geo-alt"></i> Total de Talhões</h6>
+                <h2 class="display-5">{{ total_talhoes }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card text-bg-success">
+            <div class="card-body">
+                <h6 class="card-title"><i class="bi bi-play-circle"></i> Plantios Ativos</h6>
+                <h2 class="display-5">{{ plantios_ativos }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card text-bg-warning">
+            <div class="card-body">
+                <h6 class="card-title"><i class="bi bi-clock-history"></i> Áreas em Preparo</h6>
+                <h2 class="display-5">{{ areas_preparo }}</h2>
             </div>
         </div>
     </div>
@@ -40,7 +48,7 @@
         <thead class="table-dark">
             <tr>
                 <th>Cultura</th>
-                <th>Talhão</th>
+                <th>Talhão (Propriedade)</th>
                 <th>Status</th>
                 <th>Dias Decorridos</th>
                 <th>Progresso do Ciclo</th>
@@ -51,7 +59,7 @@
             {% for p in plantios_andamento %}
             <tr>
                 <td><strong>{{ p.cultura }}</strong></td>
-                <td>{{ p.talhao.nome }}</td>
+                <td>{{ p.talhao.nome }} <small class="text-muted">({{ p.talhao.propriedade.nome }})</small></td>
                 <td><span class="badge bg-secondary">{{ p.get_status_display }}</span></td>
                 <td>{{ p.dias_decorridos }} / {{ p.ciclo_dias_estimado }}</td>
                 <td>

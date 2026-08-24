@@ -35,15 +35,15 @@
                     {% if user.is_authenticated %}
                         <div class="text-center mb-3">
                             <p class="small mb-0">Olá, <strong>{{ user.username }}</strong></p>
-                            {% if user.perfil.nome_propriedade %}
-                                <small class="text-white-50"><i class="bi bi-geo-alt"></i> {{ user.perfil.nome_propriedade }}</small>
-                            {% endif %}
+                            <small class="text-white-50"><i class="bi bi-houses"></i> {{ user.propriedades.count }} propriedade(s)</small>
                         </div>
                         <a href="{% url 'dashboard' %}"><i class="bi bi-speedometer2"></i> Dashboard</a>
+                        <a href="{% url 'propriedade_list' %}"><i class="bi bi-houses-fill"></i> Minhas Propriedades</a>
                         <a href="{% url 'talhao_list' %}"><i class="bi bi-geo-alt"></i> Meus Talhões</a>
                         <a href="{% url 'plantio_list' %}"><i class="bi bi-flower1"></i> Meus Plantios</a>
                         <hr class="text-light">
-                        <a href="{% url 'configurar_propriedade' %}"><i class="bi bi-pin-map"></i> Minha Propriedade</a>
+                        <a href="{% url 'propriedade_create' %}"><i class="bi bi-plus-circle"></i> Nova Propriedade</a>
+                        <a href="{% url 'talhao_create' %}"><i class="bi bi-plus-square"></i> Novo Talhão</a>
                         <a href="{% url 'manejo_create' %}"><i class="bi bi-tools"></i> Novo Manejo</a>
                         <a href="{% url 'irrigacao_create' %}"><i class="bi bi-droplet"></i> Nova Irrigação</a>
                         <hr class="text-light">
@@ -61,13 +61,13 @@
             </nav>
 
             <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 content-area">
-                {% if user.is_authenticated and not user.perfil.propriedade_configurada and request.resolver_match.url_name != 'configurar_propriedade' %}
+                {% if user.is_authenticated and not user.propriedades.exists and request.resolver_match.url_name != 'propriedade_create' %}
                     <div class="alert alert-warning alert-dismissible fade show mt-3 shadow-sm d-flex flex-wrap align-items-center justify-content-between gap-2" role="alert">
                         <div>
-                            <i class="bi bi-geo-alt-fill me-1 fs-5"></i>
-                            <strong>Configuração Pendente:</strong> Defina o centro da sua fazenda/propriedade para centralizar automaticamente seus mapas.
+                            <i class="bi bi-houses-fill me-1 fs-5"></i>
+                            <strong>Nenhuma Propriedade Cadastrada:</strong> Cadastre sua primeira terra (Fazenda, Sítio ou Chácara) para começar a desenhar seus talhões.
                         </div>
-                        <a href="{% url 'configurar_propriedade' %}" class="btn btn-warning btn-sm fw-bold">Configurar Propriedade</a>
+                        <a href="{% url 'propriedade_create' %}" class="btn btn-warning btn-sm fw-bold">Cadastrar Propriedade</a>
                     </div>
                 {% endif %}
 

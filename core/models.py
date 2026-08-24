@@ -25,6 +25,20 @@ def criar_perfil_usuario(sender, instance, created, **kwargs):
             PerfilUsuario.objects.get_or_create(usuario=instance)
 
 
+class Propriedade(models.Model):
+    usuario = models.ForeignKey(User, on_delete=models.CASCADE, related_name='propriedades')
+    nome = models.CharField(max_length=150) # Ex: "Fazenda Santa Luzia"
+    cidade = models.CharField(max_length=100, blank=True, null=True)
+    estado = models.CharField(max_length=2, blank=True, null=True)
+    latitude_sede = models.FloatField(help_text="Coordenada para centralizar o mapa da terra")
+    longitude_sede = models.FloatField(help_text="Coordenada para centralizar o mapa da terra")
+    area_total_ha = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.nome} ({self.usuario.username})"
+
+
 class Talhao(models.Model):
     TIPO_SOLO_CHOICES = [
         ('Arenoso', 'Arenoso'),
@@ -34,15 +48,30 @@ class Talhao(models.Model):
         ('Outro', 'Outro'),
     ]
 
-    usuario = models.ForeignKey(User, on_delete=models.CASCADE, related_name='talhoes')
-    nome = models.CharField(max_length=100)
-    area_m2 = models.DecimalField('Área (m²)', max_digits=10, decimal_places=2)
-    tipo_solo = models.CharField(max_length=50, choices=TIPO_SOLO_CHOICES, default='Misto')
-    coordenadas = models.JSONField(null=True, blank=True)
+    # O talhão agora pertence a uma Propriedade/Terra específica
+    propriedade = models.ForeignKey(Propriedade, on_delete=models.CASCADE, related_name='talhoes')
+    nome = models.CharField(max_length=100) # Ex: "Talhão 01", "T1"
+    area_m2 = models.FloatField()
+    tipo_solo = models.CharField(max_length=100, choices=TIPO_SOLO_CHOICES, default='Misto', blank=True, null=True)
+    coordenadas_json = models.JSONField(help_text="Polígono do talhão no mapa [[lat, lng], ...]", null=True, blank=True)
     observacoes = models.TextField(blank=True, null=True)
+    ativo = models.BooleanField(default=True)
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    @property
+    def coordenadas(self):
+        return self.coordenadas_json
+
+    @coordenadas.setter
+    def coordenadas(self, value):
+        self.coordenadas_json = value
+
+    @property
+    def usuario(self):
+        return self.propriedade.usuario
 
     def __str__(self):
-        return self.nome
+        return f"{self.nome} - {self.propriedade.nome}"
 
 class Plantio(models.Model):
     STATUS_CHOICES = [

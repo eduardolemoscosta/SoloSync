@@ -1,19 +1,147 @@
 from django.test import TestCase, Client
 from django.contrib.auth.models import User
 from django.urls import reverse
-from .models import Talhao, Plantio, Manejo, Irrigacao, Ocorrencia, PerfilUsuario
+from .models import Propriedade, Talhao, Plantio, Manejo, Irrigacao, Ocorrencia, PerfilUsuario
 from datetime import date
+
+
+class PropriedadeHierarchyTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(username='fazendeiro_joao', password='password123')
+        self.propriedade1 = Propriedade.objects.create(
+            usuario=self.user,
+            nome='Fazenda Santa Luzia',
+            cidade='Petrolina',
+            estado='PE',
+            latitude_sede=-9.3891,
+            longitude_sede=-40.5027,
+            area_total_ha=150.00
+        )
+        self.propriedade2 = Propriedade.objects.create(
+            usuario=self.user,
+            nome='Sítio Boa Vista',
+            cidade='Juazeiro',
+            estado='BA',
+            latitude_sede=-9.4167,
+            longitude_sede=-40.5000,
+            area_total_ha=45.50
+        )
+        self.talhao1 = Talhao.objects.create(
+            propriedade=self.propriedade1,
+            nome='Talhão 01 - Manga',
+            area_m2=20000.0,
+            tipo_solo='Arenoso',
+            coordenadas_json={
+                "type": "Polygon",
+                "coordinates": [[[-40.50, -9.38], [-40.50, -9.39], [-40.51, -9.39], [-40.51, -9.38], [-40.50, -9.38]]]
+            }
+        )
+        self.talhao2 = Talhao.objects.create(
+            propriedade=self.propriedade1,
+            nome='Talhão 02 - Uva',
+            area_m2=30000.0,
+            tipo_solo='Argiloso',
+            coordenadas_json={
+                "type": "Polygon",
+                "coordinates": [[[-40.51, -9.38], [-40.51, -9.39], [-40.52, -9.39], [-40.52, -9.38], [-40.51, -9.38]]]
+            }
+        )
+
+    def test_propriedade_str_and_relation(self):
+        self.assertEqual(str(self.propriedade1), 'Fazenda Santa Luzia (fazendeiro_joao)')
+        self.assertEqual(self.propriedade1.talhoes.count(), 2)
+        self.assertEqual(self.propriedade2.talhoes.count(), 0)
+
+    def test_talhao_str_and_properties(self):
+        self.assertEqual(str(self.talhao1), 'Talhão 01 - Manga - Fazenda Santa Luzia')
+        self.assertEqual(self.talhao1.usuario, self.user)
+        self.assertIsNotNone(self.talhao1.coordenadas)
+
+    def test_propriedade_crud_views(self):
+        self.client.login(username='fazendeiro_joao', password='password123')
+        
+        # List
+        res = self.client.get(reverse('propriedade_list'))
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, 'Fazenda Santa Luzia')
+        self.assertContains(res, 'Sítio Boa Vista')
+
+        # Create
+        res = self.client.post(reverse('propriedade_create'), {
+            'nome': 'Chácara Recanto Verde',
+            'cidade': 'Casa Nova',
+            'estado': 'BA',
+            'latitude_sede': -9.16,
+            'longitude_sede': -40.97,
+            'area_total_ha': 12.0
+        })
+        self.assertEqual(res.status_code, 302)
+        self.assertTrue(Propriedade.objects.filter(nome='Chácara Recanto Verde', usuario=self.user).exists())
+
+        # Update
+        chacara = Propriedade.objects.get(nome='Chácara Recanto Verde')
+        res = self.client.post(reverse('propriedade_update', kwargs={'pk': chacara.pk}), {
+            'nome': 'Chácara Recanto Verde Atualizada',
+            'cidade': 'Casa Nova',
+            'estado': 'BA',
+            'latitude_sede': -9.16,
+            'longitude_sede': -40.97,
+            'area_total_ha': 15.0
+        })
+        self.assertEqual(res.status_code, 302)
+        chacara.refresh_from_db()
+        self.assertEqual(chacara.nome, 'Chácara Recanto Verde Atualizada')
+        self.assertEqual(chacara.area_total_ha, 15.0)
+
+        # Delete
+        res = self.client.post(reverse('propriedade_delete', kwargs={'pk': chacara.pk}))
+        self.assertEqual(res.status_code, 302)
+        self.assertFalse(Propriedade.objects.filter(pk=chacara.pk).exists())
+
+    def test_talhao_create_in_propriedade(self):
+        self.client.login(username='fazendeiro_joao', password='password123')
+        res = self.client.post(reverse('talhao_create'), {
+            'propriedade': self.propriedade2.id,
+            'nome': 'Talhão B1',
+            'area_m2': 15000.0,
+            'tipo_solo': 'Misto',
+            'coordenadas_json': '{"type": "Polygon", "coordinates": []}'
+        })
+        self.assertEqual(res.status_code, 302)
+        self.assertTrue(Talhao.objects.filter(nome='Talhão B1', propriedade=self.propriedade2).exists())
+
+    def test_unir_talhoes_mesma_propriedade(self):
+        self.client.login(username='fazendeiro_joao', password='password123')
+        res = self.client.post(reverse('talhoes_unir'), {
+            'talhoes_ids': [self.talhao1.id, self.talhao2.id],
+            'novo_nome': 'Talhão Unificado 01+02',
+            'tipo_solo': 'Misto'
+        })
+        self.assertEqual(res.status_code, 302)
+        unificado = Talhao.objects.filter(nome='Talhão Unificado 01+02').first()
+        self.assertIsNotNone(unificado)
+        self.assertEqual(unificado.propriedade, self.propriedade1)
+        self.assertEqual(unificado.area_m2, 50000.0)
+
 
 class TalhaoDashboardTests(TestCase):
     def setUp(self):
         self.client = Client()
         self.user = User.objects.create_user(username='produtor1', password='password123')
-        self.talhao = Talhao.objects.create(
+        self.propriedade = Propriedade.objects.create(
             usuario=self.user,
+            nome='Fazenda Modelo',
+            latitude_sede=-5.8958,
+            longitude_sede=-35.7633,
+            area_total_ha=50.0
+        )
+        self.talhao = Talhao.objects.create(
+            propriedade=self.propriedade,
             nome='Talhão Sul - Milho',
-            area_m2=25000.00,
+            area_m2=25000.0,
             tipo_solo='Argiloso',
-            coordenadas={
+            coordenadas_json={
                 "type": "Polygon",
                 "coordinates": [[[-35.60, -6.15], [-35.60, -6.16], [-35.61, -6.16], [-35.61, -6.15], [-35.60, -6.15]]]
             },
@@ -70,49 +198,16 @@ class TalhaoDashboardTests(TestCase):
         self.assertContains(response, 'Talhão Sul - Milho')
         self.assertContains(response, 'Milho Híbrido')
         self.assertContains(response, 'Lagarta-do-cartucho')
+        self.assertContains(response, 'Fazenda Modelo')
 
-
-class PerfilUsuarioTests(TestCase):
-    def setUp(self):
-        self.client = Client()
-        self.user = User.objects.create_user(username='novo_fazendeiro', password='password123')
-
-    def test_perfil_auto_created(self):
-        self.assertTrue(hasattr(self.user, 'perfil'))
-        self.assertEqual(self.user.perfil.propriedade_configurada, False)
-        self.assertEqual(self.user.perfil.latitude_propriedade, -5.8958)
-        self.assertEqual(self.user.perfil.longitude_propriedade, -35.7633)
-
-    def test_configurar_propriedade_get(self):
-        self.client.login(username='novo_fazendeiro', password='password123')
-        response = self.client.get(reverse('configurar_propriedade'))
-        self.assertEqual(response.status_code, 200)
-        self.assertTemplateUsed(response, 'core/configurar_propriedade.html')
-        self.assertTrue(response.context['is_onboarding'])
-
-    def test_configurar_propriedade_post(self):
-        self.client.login(username='novo_fazendeiro', password='password123')
-        response = self.client.post(reverse('configurar_propriedade'), {
-            'nome_propriedade': 'Fazenda Bela Vista',
-            'latitude_propriedade': -5.912345,
-            'longitude_propriedade': -35.789012,
-        })
-        self.assertEqual(response.status_code, 302)
-        self.assertRedirects(response, reverse('dashboard'))
-        self.user.perfil.refresh_from_db()
-        self.assertEqual(self.user.perfil.nome_propriedade, 'Fazenda Bela Vista')
-        self.assertEqual(self.user.perfil.latitude_propriedade, -5.912345)
-        self.assertEqual(self.user.perfil.longitude_propriedade, -35.789012)
-        self.assertEqual(self.user.perfil.propriedade_configurada, True)
-
-    def test_signup_redirects_to_configurar_propriedade(self):
+    def test_signup_redirects_to_propriedade_create(self):
         response = self.client.post(reverse('signup'), {
             'username': 'usuario_onboarding',
             'password1': 'Teste123SenhaForte!#',
             'password2': 'Teste123SenhaForte!#',
         })
-        # Verificamos se cria o usuário e redireciona para a configuração inicial da propriedade
+        self.assertEqual(response.status_code, 302)
+        self.assertRedirects(response, reverse('propriedade_create'))
         novo_user = User.objects.filter(username='usuario_onboarding').first()
         self.assertIsNotNone(novo_user)
-        self.assertTrue(hasattr(novo_user, 'perfil'))
-        self.assertEqual(novo_user.perfil.propriedade_configurada, False)
+

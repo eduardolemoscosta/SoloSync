@@ -6,11 +6,11 @@ from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
 from django.contrib import messages
-from django.db import transaction
+from django.db import transaction, models
 from decimal import Decimal
 import json
-from .models import Talhao, Plantio, Manejo, Irrigacao, Ocorrencia, PerfilUsuario
-from .forms import TalhaoForm, PlantioForm, ManejoForm, IrrigacaoForm, OcorrenciaForm, PerfilUsuarioForm
+from .models import Propriedade, Talhao, Plantio, Manejo, Irrigacao, Ocorrencia, PerfilUsuario
+from .forms import PropriedadeForm, TalhaoForm, PlantioForm, ManejoForm, IrrigacaoForm, OcorrenciaForm, PerfilUsuarioForm
 from django.contrib.auth import login
 
 
@@ -21,8 +21,8 @@ def signup(request):
             user = form.save()
             PerfilUsuario.objects.get_or_create(usuario=user)
             login(request, user)
-            messages.success(request, 'Conta criada com sucesso! Configure a localização da sua propriedade.')
-            return redirect('configurar_propriedade')
+            messages.success(request, 'Conta criada com sucesso! Cadastre sua primeira propriedade/fazenda.')
+            return redirect('propriedade_create')
     else:
         form = UserCreationForm()
     return render(request, 'registration/signup.html', {'form': form})
@@ -48,85 +48,241 @@ def configurar_propriedade(request):
     })
 
 
+# ==========================================
+# CRUD de Propriedades / Terras (Fazendas)
+# ==========================================
+
+class PropriedadeListView(LoginRequiredMixin, ListView):
+    model = Propriedade
+    template_name = 'core/propriedade_list.html'
+    context_object_name = 'propriedades'
+
+    def get_queryset(self):
+        return Propriedade.objects.filter(usuario=self.request.user).annotate(
+            total_talhoes=models.Count('talhoes', filter=models.Q(talhoes__ativo=True))
+        ).order_by('-criado_em')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        propriedades_data = []
+        for p in context['propriedades']:
+            propriedades_data.append({
+                'id': p.id,
+                'nome': p.nome,
+                'cidade': p.cidade or '',
+                'estado': p.estado or '',
+                'lat': p.latitude_sede,
+                'lng': p.longitude_sede,
+                'area_ha': str(p.area_total_ha) if p.area_total_ha else '0',
+                'talhoes_count': p.total_talhoes
+            })
+        context['propriedades_json'] = json.dumps(propriedades_data)
+        return context
+
+
+class PropriedadeCreateView(LoginRequiredMixin, CreateView):
+    model = Propriedade
+    form_class = PropriedadeForm
+    template_name = 'core/propriedade_form.html'
+    success_url = reverse_lazy('propriedade_list')
+
+    def form_valid(self, form):
+        form.instance.usuario = self.request.user
+        messages.success(self.request, f'Propriedade "{form.instance.nome}" cadastrada com sucesso!')
+        return super().form_valid(form)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = 'Cadastrar Nova Propriedade / Terra'
+        return context
+
+
+class PropriedadeUpdateView(LoginRequiredMixin, UpdateView):
+    model = Propriedade
+    form_class = PropriedadeForm
+    template_name = 'core/propriedade_form.html'
+    success_url = reverse_lazy('propriedade_list')
+
+    def get_queryset(self):
+        return Propriedade.objects.filter(usuario=self.request.user)
+
+    def form_valid(self, form):
+        messages.success(self.request, f'Propriedade "{form.instance.nome}" atualizada com sucesso!')
+        return super().form_valid(form)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = f'Editar Propriedade: {self.object.nome}'
+        return context
+
+
+class PropriedadeDeleteView(LoginRequiredMixin, DeleteView):
+    model = Propriedade
+    template_name = 'core/confirm_delete.html'
+    success_url = reverse_lazy('propriedade_list')
+
+    def get_queryset(self):
+        return Propriedade.objects.filter(usuario=self.request.user)
+
+    def form_valid(self, form):
+        messages.success(self.request, 'Propriedade excluída com sucesso.')
+        return super().form_valid(form)
+
+
+# ==========================================
+# Dashboard & Talhões
+# ==========================================
+
 class DashboardView(LoginRequiredMixin, TemplateView):
     template_name = 'core/dashboard.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         user = self.request.user
-        plantios = Plantio.objects.filter(talhao__usuario=user)
+        plantios = Plantio.objects.filter(talhao__propriedade__usuario=user)
+        context['total_propriedades'] = Propriedade.objects.filter(usuario=user).count()
         context['plantios_ativos'] = plantios.filter(status='ATIVO').count()
         context['areas_preparo'] = plantios.filter(status='PREPARO').count()
-        context['total_talhoes'] = Talhao.objects.filter(usuario=user).count()
+        context['total_talhoes'] = Talhao.objects.filter(propriedade__usuario=user, ativo=True).count()
         context['plantios_andamento'] = plantios.exclude(status='FINALIZADO').order_by('-data_plantio')
         return context
+
 
 class TalhaoListView(LoginRequiredMixin, ListView):
     model = Talhao
     template_name = 'core/talhao_list.html'
     context_object_name = 'talhoes'
+
     def get_queryset(self):
-        return Talhao.objects.filter(usuario=self.request.user)
+        qs = Talhao.objects.filter(propriedade__usuario=self.request.user, ativo=True).select_related('propriedade')
+        propriedade_id = self.request.GET.get('propriedade')
+        if propriedade_id:
+            qs = qs.filter(propriedade_id=propriedade_id)
+        return qs.order_by('propriedade__nome', 'nome')
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        import json
         talhoes_data = []
         for t in context['talhoes']:
-            if t.coordenadas:
+            if t.coordenadas_json:
                 talhoes_data.append({
                     'id': t.id,
                     'nome': t.nome,
+                    'propriedade_nome': t.propriedade.nome,
                     'area': str(t.area_m2),
-                    'geojson': t.coordenadas
+                    'geojson': t.coordenadas_json
                 })
         context['talhoes_json'] = json.dumps(talhoes_data)
+        context['propriedades'] = Propriedade.objects.filter(usuario=self.request.user).order_by('nome')
+        context['selected_propriedade'] = self.request.GET.get('propriedade', '')
+
+        # Se houver propriedade selecionada, obter suas coordenadas centrais
+        prop_selecionada = None
+        if context['selected_propriedade']:
+            prop_selecionada = context['propriedades'].filter(id=context['selected_propriedade']).first()
+        elif context['propriedades'].exists():
+            prop_selecionada = context['propriedades'].first()
+
+        context['centro_mapa_lat'] = prop_selecionada.latitude_sede if prop_selecionada else -5.8958
+        context['centro_mapa_lng'] = prop_selecionada.longitude_sede if prop_selecionada else -35.7633
         return context
+
 
 class TalhaoCreateView(LoginRequiredMixin, CreateView):
     model = Talhao
     form_class = TalhaoForm
     template_name = 'core/talhao_form.html'
     success_url = reverse_lazy('talhao_list')
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        return kwargs
+
     def form_valid(self, form):
-        form.instance.usuario = self.request.user
+        # Valida que a propriedade pertence ao usuário
+        if form.instance.propriedade.usuario != self.request.user:
+            messages.error(self.request, 'Propriedade inválida.')
+            return self.form_invalid(form)
+        messages.success(self.request, f'Talhão "{form.instance.nome}" criado com sucesso!')
         return super().form_valid(form)
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['title'] = 'Novo Talhão'
-        import json
-        existentes = Talhao.objects.filter(usuario=self.request.user).exclude(coordenadas__isnull=True)
-        data = [{'nome': t.nome, 'geojson': t.coordenadas} for t in existentes]
+        
+        user_props = Propriedade.objects.filter(usuario=self.request.user)
+        propriedades_map = {}
+        for p in user_props:
+            propriedades_map[str(p.id)] = {
+                'lat': p.latitude_sede,
+                'lng': p.longitude_sede,
+                'nome': p.nome
+            }
+        context['propriedades_map_json'] = json.dumps(propriedades_map)
+
+        existentes = Talhao.objects.filter(propriedade__usuario=self.request.user, ativo=True).exclude(coordenadas_json__isnull=True)
+        data = [{'nome': t.nome, 'propriedade_id': t.propriedade_id, 'geojson': t.coordenadas_json} for t in existentes]
         context['talhoes_existentes_json'] = json.dumps(data)
+
+        primeira_prop = user_props.first()
+        context['default_lat'] = primeira_prop.latitude_sede if primeira_prop else -5.8958
+        context['default_lng'] = primeira_prop.longitude_sede if primeira_prop else -35.7633
         return context
+
 
 class TalhaoUpdateView(LoginRequiredMixin, UpdateView):
     model = Talhao
     form_class = TalhaoForm
     template_name = 'core/talhao_form.html'
     success_url = reverse_lazy('talhao_list')
+
     def get_queryset(self):
-        return Talhao.objects.filter(usuario=self.request.user)
+        return Talhao.objects.filter(propriedade__usuario=self.request.user)
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        return kwargs
+
+    def form_valid(self, form):
+        if form.instance.propriedade.usuario != self.request.user:
+            messages.error(self.request, 'Propriedade inválida.')
+            return self.form_invalid(form)
+        messages.success(self.request, f'Talhão "{form.instance.nome}" atualizado com sucesso!')
+        return super().form_valid(form)
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = 'Editar Talhão'
-        import json
-        existentes = Talhao.objects.filter(usuario=self.request.user).exclude(pk=self.object.pk).exclude(coordenadas__isnull=True)
-        data = [{'nome': t.nome, 'geojson': t.coordenadas} for t in existentes]
+        context['title'] = f'Editar Talhão: {self.object.nome}'
+        
+        user_props = Propriedade.objects.filter(usuario=self.request.user)
+        propriedades_map = {}
+        for p in user_props:
+            propriedades_map[str(p.id)] = {
+                'lat': p.latitude_sede,
+                'lng': p.longitude_sede,
+                'nome': p.nome
+            }
+        context['propriedades_map_json'] = json.dumps(propriedades_map)
+
+        existentes = Talhao.objects.filter(propriedade__usuario=self.request.user, ativo=True).exclude(pk=self.object.pk).exclude(coordenadas_json__isnull=True)
+        data = [{'nome': t.nome, 'propriedade_id': t.propriedade_id, 'geojson': t.coordenadas_json} for t in existentes]
         context['talhoes_existentes_json'] = json.dumps(data)
+
+        context['default_lat'] = self.object.propriedade.latitude_sede
+        context['default_lng'] = self.object.propriedade.longitude_sede
         return context
+
 
 class TalhaoDeleteView(LoginRequiredMixin, DeleteView):
     model = Talhao
     template_name = 'core/confirm_delete.html'
     success_url = reverse_lazy('talhao_list')
-    def get_queryset(self):
-        return Talhao.objects.filter(usuario=self.request.user)
 
-from django.db import transaction
-from django.contrib import messages
-from django.views.decorators.http import require_POST
-from django.contrib.auth.decorators import login_required
-from decimal import Decimal
+    def get_queryset(self):
+        return Talhao.objects.filter(propriedade__usuario=self.request.user)
+
 
 @login_required
 @require_POST
@@ -140,11 +296,19 @@ def unir_talhoes(request):
         messages.error(request, 'Selecione pelo menos 2 talhões para unir.')
         return redirect('talhao_list')
 
-    talhoes = Talhao.objects.filter(id__in=talhao_ids, usuario=request.user)
+    talhoes = Talhao.objects.filter(id__in=talhao_ids, propriedade__usuario=request.user)
     
     if talhoes.count() != len(talhao_ids):
         messages.error(request, 'Talhões inválidos ou não pertencem a você.')
         return redirect('talhao_list')
+
+    # Valida se pertencem à mesma propriedade
+    propriedades_ids = set(t.propriedade_id for t in talhoes)
+    if len(propriedades_ids) > 1:
+        messages.error(request, 'Só é possível unir talhões que pertencem à mesma propriedade.')
+        return redirect('talhao_list')
+
+    propriedade_origem = talhoes.first().propriedade
 
     if Plantio.objects.filter(talhao__in=talhoes, status__in=['ATIVO', 'PREPARO', 'COLHEITA']).exists():
         messages.error(request, 'Não é possível unir talhões que possuem plantios ativos. Finalize-os primeiro.')
@@ -154,12 +318,11 @@ def unir_talhoes(request):
         with transaction.atomic():
             area_total = sum(t.area_m2 for t in talhoes)
             
-            import json
             multipolygon_coords = []
             for t in talhoes:
-                if t.coordenadas:
+                if t.coordenadas_json:
                     try:
-                        coord_dict = t.coordenadas if isinstance(t.coordenadas, dict) else json.loads(t.coordenadas)
+                        coord_dict = t.coordenadas_json if isinstance(t.coordenadas_json, dict) else json.loads(t.coordenadas_json)
                         geom = coord_dict.get('geometry') if coord_dict.get('type') == 'Feature' else coord_dict
                         
                         geom_type = geom.get('type')
@@ -184,31 +347,31 @@ def unir_talhoes(request):
                 }
 
             novo_talhao = Talhao(
+                propriedade=propriedade_origem,
                 nome=novo_nome,
                 area_m2=area_total,
                 tipo_solo=tipo_solo,
                 observacoes=observacoes,
-                coordenadas=merged_geojson
+                coordenadas_json=merged_geojson
             )
-            novo_talhao.usuario = request.user
-            
             novo_talhao.save()
             
             Plantio.objects.filter(talhao__in=talhoes).update(talhao=novo_talhao)
             
             talhoes.delete()
             
-            messages.success(request, f'Sucesso: "{novo_nome}" criado com {area_total} m² e todo histórico preservado.')
+            messages.success(request, f'Sucesso: "{novo_nome}" criado com {area_total} m² na propriedade {propriedade_origem.nome}.')
             
     except Exception as e:
         messages.error(request, f'Falha ao mesclar talhões no banco de dados: {str(e)}')
 
     return redirect('talhao_list')
 
+
 @login_required
 @require_POST
 def dividir_talhao(request, pk):
-    talhao = get_object_or_404(Talhao, pk=pk, usuario=request.user)
+    talhao = get_object_or_404(Talhao, pk=pk, propriedade__usuario=request.user)
     
     nomes = request.POST.getlist('fracao_nome[]')
     areas = request.POST.getlist('fracao_area[]')
@@ -218,28 +381,29 @@ def dividir_talhao(request, pk):
         return redirect('talhao_list')
 
     try:
-        areas_decimal = [Decimal(a) for a in areas]
+        areas_float = [float(a) for a in areas]
     except Exception:
         messages.error(request, 'Valores de área inválidos.')
         return redirect('talhao_list')
 
-    if sum(areas_decimal) != talhao.area_m2:
-        messages.error(request, 'A soma das áreas das frações deve ser exatamente igual à área original do talhão.')
+    if abs(sum(areas_float) - talhao.area_m2) > 0.05:
+        messages.error(request, 'A soma das áreas das frações deve ser igual à área original do talhão.')
         return redirect('talhao_list')
 
     with transaction.atomic():
-        for nome, area in zip(nomes, areas_decimal):
+        for nome, area in zip(nomes, areas_float):
             Talhao.objects.create(
-                usuario=request.user,
+                propriedade=talhao.propriedade,
                 nome=nome,
                 area_m2=area,
                 tipo_solo=talhao.tipo_solo,
-                coordenadas=talhao.coordenadas
+                coordenadas_json=talhao.coordenadas_json
             )
         talhao.delete()
         messages.success(request, 'Talhão dividido com sucesso.')
 
     return redirect('talhao_list')
+
 
 @login_required
 @require_POST
@@ -253,20 +417,20 @@ def dividir_talhao_mapa(request):
         messages.error(request, 'Dados de corte inválidos.')
         return redirect('talhao_list')
         
-    talhao = get_object_or_404(Talhao, pk=talhao_id, usuario=request.user)
+    talhao = get_object_or_404(Talhao, pk=talhao_id, propriedade__usuario=request.user)
     
     try:
         with transaction.atomic():
             for nome, area, geojson in zip(nomes, areas, geojsons):
-                novo = Talhao.objects.create(
-                    usuario=request.user,
+                Talhao.objects.create(
+                    propriedade=talhao.propriedade,
                     nome=nome,
-                    area_m2=Decimal(area),
+                    area_m2=float(area),
                     tipo_solo=talhao.tipo_solo,
-                    coordenadas=geojson
+                    coordenadas_json=geojson
                 )
             
-            primeiro_novo = Talhao.objects.filter(usuario=request.user, nome=nomes[0]).last()
+            primeiro_novo = Talhao.objects.filter(propriedade=talhao.propriedade, nome=nomes[0]).last()
             Plantio.objects.filter(talhao=talhao).update(talhao=primeiro_novo)
             
             talhao.delete()
@@ -277,10 +441,11 @@ def dividir_talhao_mapa(request):
 
     return redirect('talhao_list')
 
+
 @login_required
 @require_POST
 def registrar_colheita(request, pk):
-    plantio = get_object_or_404(Plantio, pk=pk, talhao__usuario=request.user)
+    plantio = get_object_or_404(Plantio, pk=pk, talhao__propriedade__usuario=request.user)
     
     data_colheita = request.POST.get('data_colheita')
     quantidade = request.POST.get('quantidade', '')
@@ -310,39 +475,52 @@ def registrar_colheita(request, pk):
 
     return redirect('plantio_list')
 
+
+# ==========================================
+# Plantios, Manejos, Irrigações e Ocorrências
+# ==========================================
+
 class PlantioListView(LoginRequiredMixin, ListView):
     model = Plantio
     template_name = 'core/plantio_list.html'
     context_object_name = 'plantios'
+
     def get_queryset(self):
-        return Plantio.objects.filter(talhao__usuario=self.request.user)
+        return Plantio.objects.filter(talhao__propriedade__usuario=self.request.user).select_related('talhao', 'talhao__propriedade')
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        import json
         plantios_data = []
         for p in context['plantios']:
-            if p.talhao.coordenadas:
+            if p.talhao.coordenadas_json:
                 status_dias = "Pronto para colheita" if p.dias_restantes() <= 0 else f"Faltam {p.dias_restantes()} dias (Dia {p.dias_passados()} de {p.ciclo_dias_estimado})"
                 plantios_data.append({
                     'id': p.id,
                     'cultura': p.cultura,
                     'status': p.get_status_display(),
-                    'talhao': p.talhao.nome,
+                    'talhao': f"{p.talhao.nome} ({p.talhao.propriedade.nome})",
                     'variedade': p.variedade or "Não informada",
                     'data_plantio': p.data_plantio.strftime('%d/%m/%Y') if p.data_plantio else "Não definido",
                     'ciclo': p.ciclo_dias_estimado,
                     'status_dias': status_dias,
-                    'geojson': p.talhao.coordenadas
+                    'geojson': p.talhao.coordenadas_json
                 })
         context['plantios_json'] = json.dumps(plantios_data)
+        
+        primeira_prop = Propriedade.objects.filter(usuario=self.request.user).first()
+        context['default_lat'] = primeira_prop.latitude_sede if primeira_prop else -5.8958
+        context['default_lng'] = primeira_prop.longitude_sede if primeira_prop else -35.7633
         return context
+
 
 class PlantioDetailView(LoginRequiredMixin, DetailView):
     model = Plantio
     template_name = 'core/plantio_detail.html'
     context_object_name = 'plantio'
+
     def get_queryset(self):
-        return Plantio.objects.filter(talhao__usuario=self.request.user)
+        return Plantio.objects.filter(talhao__propriedade__usuario=self.request.user)
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         manejos = list(self.object.manejos.all())
@@ -356,112 +534,126 @@ class PlantioDetailView(LoginRequiredMixin, DetailView):
         context['historico'] = historico
         return context
 
+
 class PlantioCreateView(LoginRequiredMixin, CreateView):
     model = Plantio
     form_class = PlantioForm
     template_name = 'core/form_generic.html'
     success_url = reverse_lazy('plantio_list')
+
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs['user'] = self.request.user
         return kwargs
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['title'] = 'Novo Plantio'
         return context
+
 
 class PlantioUpdateView(LoginRequiredMixin, UpdateView):
     model = Plantio
     form_class = PlantioForm
     template_name = 'core/form_generic.html'
     success_url = reverse_lazy('plantio_list')
+
     def get_queryset(self):
-        return Plantio.objects.filter(talhao__usuario=self.request.user)
+        return Plantio.objects.filter(talhao__propriedade__usuario=self.request.user)
+
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs['user'] = self.request.user
         return kwargs
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['title'] = 'Editar Plantio'
         return context
 
+
 class PlantioDeleteView(LoginRequiredMixin, DeleteView):
     model = Plantio
     template_name = 'core/confirm_delete.html'
     success_url = reverse_lazy('plantio_list')
+
     def get_queryset(self):
-        return Plantio.objects.filter(talhao__usuario=self.request.user)
+        return Plantio.objects.filter(talhao__propriedade__usuario=self.request.user)
+
 
 class ManejoCreateView(LoginRequiredMixin, CreateView):
     model = Manejo
     form_class = ManejoForm
     template_name = 'core/form_generic.html'
     success_url = reverse_lazy('dashboard')
+
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs['user'] = self.request.user
         return kwargs
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['title'] = 'Registrar Manejo'
         return context
+
 
 class IrrigacaoCreateView(LoginRequiredMixin, CreateView):
     model = Irrigacao
     form_class = IrrigacaoForm
     template_name = 'core/form_generic.html'
     success_url = reverse_lazy('dashboard')
+
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs['user'] = self.request.user
         return kwargs
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['title'] = 'Registrar Irrigação'
         return context
+
 
 class OcorrenciaCreateView(LoginRequiredMixin, CreateView):
     model = Ocorrencia
     form_class = OcorrenciaForm
     template_name = 'core/form_generic.html'
     success_url = reverse_lazy('dashboard')
+
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs['user'] = self.request.user
         return kwargs
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['title'] = 'Registrar Ocorrência'
         return context
 
+
 @login_required
 def talhao_dashboard(request, pk):
-    talhao = get_object_or_404(Talhao, pk=pk, usuario=request.user)
-    todos_talhoes = Talhao.objects.filter(usuario=request.user).order_by('nome')
+    talhao = get_object_or_404(Talhao, pk=pk, propriedade__usuario=request.user)
+    todos_talhoes = Talhao.objects.filter(propriedade=talhao.propriedade, ativo=True).order_by('nome')
 
-    # Plantio ativo ou em andamento
     plantio_ativo = Plantio.objects.filter(
         talhao=talhao,
         status__in=['ATIVO', 'PREPARO', 'COLHEITA']
     ).order_by('-id').first()
 
-    # Histórico de plantios neste talhão
     plantios_historico = Plantio.objects.filter(talhao=talhao).order_by('-data_plantio', '-id')
 
-    # Histórico de Manejos, Irrigações e Ocorrências no Talhão
     manejos = Manejo.objects.filter(plantio__talhao=talhao).select_related('plantio').order_by('-data', '-id')
     irrigacoes = Irrigacao.objects.filter(plantio__talhao=talhao).select_related('plantio').order_by('-data_hora', '-id')
     ocorrencias = Ocorrencia.objects.filter(plantio__talhao=talhao).select_related('plantio').order_by('-data', '-id')
 
-    # Contagens e estatísticas de aplicações
     total_irrigacoes = irrigacoes.count()
     total_adubacoes = manejos.filter(tipo_operacao__icontains='Adubação').count()
     total_defensivos = manejos.filter(tipo_operacao__icontains='Pulverização').count() + manejos.filter(tipo_operacao__icontains='Defensivo').count()
     total_ocorrencias = ocorrencias.count()
     total_aplicacoes = total_irrigacoes + manejos.count()
 
-    # Linha do tempo unificada de manejos e atividades
     timeline_manejos = []
     for m in manejos:
         badge_class = "bg-primary"
@@ -509,10 +701,8 @@ def talhao_dashboard(request, pk):
 
     timeline_manejos.sort(key=lambda x: x['data'], reverse=True)
 
-    # Cálculo da área em hectares (1 ha = 10.000 m²)
     area_ha = round(float(talhao.area_m2) / 10000.0, 2)
 
-    # Status textual e classe de badge do talhão
     if plantio_ativo:
         if plantio_ativo.status == 'ATIVO':
             status_display = 'Ativo'
@@ -530,17 +720,16 @@ def talhao_dashboard(request, pk):
         status_display = 'Sem Plantio'
         status_badge_class = 'bg-secondary'
 
-    # GeoJSON do Talhão para o Leaflet
-    import json
     talhao_geojson = None
-    if talhao.coordenadas:
-        if isinstance(talhao.coordenadas, dict):
-            talhao_geojson = json.dumps(talhao.coordenadas)
+    if talhao.coordenadas_json:
+        if isinstance(talhao.coordenadas_json, dict):
+            talhao_geojson = json.dumps(talhao.coordenadas_json)
         else:
-            talhao_geojson = str(talhao.coordenadas)
+            talhao_geojson = str(talhao.coordenadas_json)
 
     context = {
         'talhao': talhao,
+        'propriedade': talhao.propriedade,
         'todos_talhoes': todos_talhoes,
         'plantio_ativo': plantio_ativo,
         'status_display': status_display,
@@ -555,5 +744,8 @@ def talhao_dashboard(request, pk):
         'ocorrencias': ocorrencias,
         'plantios_historico': plantios_historico,
         'talhao_geojson': talhao_geojson,
+        'default_lat': talhao.propriedade.latitude_sede,
+        'default_lng': talhao.propriedade.longitude_sede,
     }
     return render(request, 'core/talhao_dashboard.html', context)
+

@@ -2,12 +2,28 @@
 
 {% block content %}
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h2>Meus Talhões</h2>
     <div>
-        <button type="button" class="btn btn-warning me-2" id="btn-unir" data-bs-toggle="modal" data-bs-target="#modalUnir" disabled>
-            <i class="bi bi-intersect"></i> Unir Selecionados
+        <h2>Meus Talhões</h2>
+        {% if selected_propriedade %}
+            <span class="badge bg-success">Filtrado por: {% for p in propriedades %}{% if p.id|stringformat:'s' == selected_propriedade %}{{ p.nome }}{% endif %}{% endfor %}</span>
+            <a href="{% url 'talhao_list' %}" class="small text-muted ms-2">Limpar filtro</a>
+        {% endif %}
+    </div>
+    <div class="d-flex align-items-center gap-2">
+        {% if propriedades %}
+        <select class="form-select form-select-sm" onchange="location.href=this.value ? '?propriedade='+this.value : '{% url 'talhao_list' %}';" style="min-width: 180px;">
+            <option value="">Todas as Propriedades</option>
+            {% for p in propriedades %}
+                <option value="{{ p.id }}" {% if selected_propriedade == p.id|stringformat:'s' %}selected{% endif %}>
+                    🏡 {{ p.nome }}
+                </option>
+            {% endfor %}
+        </select>
+        {% endif %}
+        <button type="button" class="btn btn-warning btn-sm me-1" id="btn-unir" data-bs-toggle="modal" data-bs-target="#modalUnir" disabled>
+            <i class="bi bi-intersect"></i> Unir
         </button>
-        <a href="{% url 'talhao_create' %}" class="btn btn-success"><i class="bi bi-plus-lg"></i> Novo Talhão</a>
+        <a href="{% url 'talhao_create' %}" class="btn btn-success btn-sm"><i class="bi bi-plus-lg"></i> Novo Talhão</a>
     </div>
 </div>
 
@@ -36,6 +52,7 @@
                 <tr>
                     <th style="width: 40px;"><input class="form-check-input" type="checkbox" id="checkAll"></th>
                     <th>Nome</th>
+                    <th>Propriedade</th>
                     <th>Área (m²)</th>
                     <th>Tipo de Solo</th>
                     <th class="text-end">Ações</th>
@@ -45,7 +62,8 @@
                 {% for talhao in talhoes %}
                 <tr>
                     <td><input class="form-check-input talhao-check" type="checkbox" name="talhoes_ids" value="{{ talhao.id }}" data-area="{{ talhao.area_m2|stringformat:'f' }}"></td>
-                    <td>{{ talhao.nome }}</td>
+                    <td><strong>{{ talhao.nome }}</strong></td>
+                    <td><span class="badge bg-light text-dark border"><i class="bi bi-geo-alt text-success"></i> {{ talhao.propriedade.nome }}</span></td>
                     <td>{{ talhao.area_m2 }}</td>
                     <td>{{ talhao.tipo_solo }}</td>
                     <td class="text-end">
@@ -157,8 +175,8 @@
 <script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.js"></script>
 <script>
     document.addEventListener("DOMContentLoaded", function() {
-        var defaultLat = {{ request.user.perfil.latitude_propriedade|stringformat:'f'|default:"-5.8958" }};
-        var defaultLng = {{ request.user.perfil.longitude_propriedade|stringformat:'f'|default:"-35.7633" }};
+        var defaultLat = {{ centro_mapa_lat|stringformat:'f'|default:"-5.8958" }};
+        var defaultLng = {{ centro_mapa_lng|stringformat:'f'|default:"-35.7633" }};
         var map = L.map('mapAll').setView([defaultLat, defaultLng], 14);
         
         L.tileLayer('https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
@@ -195,7 +213,7 @@
                                 l.talhaoId = t.id;
                             });
                             
-                            layer.bindPopup('<b>' + t.nome + '</b><br>Área: ' + t.area + ' m²');
+                            layer.bindPopup('<b>' + t.nome + '</b> (' + t.propriedade_nome + ')<br>Área: ' + t.area + ' m²');
                             allItems.addLayer(layer);
                         }
                     } catch(e) { console.error(e); }

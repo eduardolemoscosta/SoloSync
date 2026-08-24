@@ -1,5 +1,19 @@
 from django import forms
-from .models import PerfilUsuario, Talhao, Plantio, Manejo, Irrigacao, Ocorrencia
+from .models import Propriedade, Talhao, Plantio, Manejo, Irrigacao, Ocorrencia, PerfilUsuario
+
+class PropriedadeForm(forms.ModelForm):
+    class Meta:
+        model = Propriedade
+        fields = ['nome', 'cidade', 'estado', 'latitude_sede', 'longitude_sede', 'area_total_ha']
+        widgets = {
+            'nome': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Fazenda Santa Luzia'}),
+            'cidade': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Petrolina'}),
+            'estado': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: PE', 'maxlength': '2'}),
+            'latitude_sede': forms.NumberInput(attrs={'class': 'form-control', 'step': 'any', 'id': 'id_latitude_sede'}),
+            'longitude_sede': forms.NumberInput(attrs={'class': 'form-control', 'step': 'any', 'id': 'id_longitude_sede'}),
+            'area_total_ha': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'placeholder': 'Ex: 120.50'}),
+        }
+
 
 class PerfilUsuarioForm(forms.ModelForm):
     class Meta:
@@ -15,14 +29,24 @@ class PerfilUsuarioForm(forms.ModelForm):
 class TalhaoForm(forms.ModelForm):
     class Meta:
         model = Talhao
-        fields = ['nome', 'area_m2', 'tipo_solo', 'coordenadas', 'observacoes']
+        fields = ['propriedade', 'nome', 'area_m2', 'tipo_solo', 'coordenadas_json', 'observacoes']
         widgets = {
-            'nome': forms.TextInput(attrs={'class': 'form-control'}),
+            'propriedade': forms.Select(attrs={'class': 'form-select', 'id': 'id_propriedade'}),
+            'nome': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Talhão 01, T1'}),
             'area_m2': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'readonly': 'readonly'}),
             'tipo_solo': forms.Select(attrs={'class': 'form-select'}),
-            'coordenadas': forms.HiddenInput(attrs={'id': 'id_coordenadas'}),
+            'coordenadas_json': forms.HiddenInput(attrs={'id': 'id_coordenadas_json'}),
             'observacoes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
         }
+
+    def __init__(self, *args, **kwargs):
+        user = kwargs.pop('user', None)
+        super(TalhaoForm, self).__init__(*args, **kwargs)
+        if user:
+            self.fields['propriedade'].queryset = Propriedade.objects.filter(usuario=user)
+            if not self.instance.pk and self.fields['propriedade'].queryset.exists():
+                self.fields['propriedade'].initial = self.fields['propriedade'].queryset.first()
+
 
 class PlantioForm(forms.ModelForm):
     class Meta:
@@ -41,7 +65,7 @@ class PlantioForm(forms.ModelForm):
         user = kwargs.pop('user', None)
         super(PlantioForm, self).__init__(*args, **kwargs)
         if user:
-            self.fields['talhao'].queryset = Talhao.objects.filter(usuario=user)
+            self.fields['talhao'].queryset = Talhao.objects.filter(propriedade__usuario=user, ativo=True)
 
     def clean(self):
         cleaned_data = super().clean()
@@ -65,6 +89,7 @@ class PlantioForm(forms.ModelForm):
 
         return cleaned_data
 
+
 class ManejoForm(forms.ModelForm):
     class Meta:
         model = Manejo
@@ -82,7 +107,8 @@ class ManejoForm(forms.ModelForm):
         user = kwargs.pop('user', None)
         super(ManejoForm, self).__init__(*args, **kwargs)
         if user:
-            self.fields['plantio'].queryset = Plantio.objects.filter(talhao__usuario=user)
+            self.fields['plantio'].queryset = Plantio.objects.filter(talhao__propriedade__usuario=user)
+
 
 class IrrigacaoForm(forms.ModelForm):
     class Meta:
@@ -100,7 +126,8 @@ class IrrigacaoForm(forms.ModelForm):
         user = kwargs.pop('user', None)
         super(IrrigacaoForm, self).__init__(*args, **kwargs)
         if user:
-            self.fields['plantio'].queryset = Plantio.objects.filter(talhao__usuario=user)
+            self.fields['plantio'].queryset = Plantio.objects.filter(talhao__propriedade__usuario=user)
+
 
 class OcorrenciaForm(forms.ModelForm):
     class Meta:
@@ -118,4 +145,4 @@ class OcorrenciaForm(forms.ModelForm):
         user = kwargs.pop('user', None)
         super(OcorrenciaForm, self).__init__(*args, **kwargs)
         if user:
-            self.fields['plantio'].queryset = Plantio.objects.filter(talhao__usuario=user)
+            self.fields['plantio'].queryset = Plantio.objects.filter(talhao__propriedade__usuario=user)

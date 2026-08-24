@@ -6,16 +6,16 @@
 <link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.css" />
 
 <style>
-    #map { height: 400px; width: 100%; border-radius: 5px; margin-bottom: 20px; border: 1px solid #ccc; z-index: 1;}
+    #map { height: 420px; width: 100%; border-radius: 5px; margin-bottom: 20px; border: 1px solid #ccc; z-index: 1;}
 </style>
 
 <div class="row justify-content-center mt-4">
-    <div class="col-md-10">
-        <div class="card shadow-sm">
-            <div class="card-header bg-success text-white">
-                <h5 class="mb-0">{{ title }}</h5>
+    <div class="col-md-11">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-success text-white py-3">
+                <h5 class="mb-0"><i class="bi bi-bounding-box-circles me-2"></i>{{ title }}</h5>
             </div>
-            <div class="card-body">
+            <div class="card-body p-4">
                 <form method="post">
                     {% csrf_token %}
                     
@@ -27,11 +27,11 @@
                         </div>
                     {% endif %}
 
-                    <div class="row">
+                    <div class="row g-4">
                         <!-- Formulário -->
                         <div class="col-md-5">
                             {% for field in form %}
-                                {% if field.name == 'coordenadas' %}
+                                {% if field.name == 'coordenadas' or field.name == 'coordenadas_json' %}
                                     {{ field }}
                                 {% else %}
                                     <div class="mb-3">
@@ -50,15 +50,21 @@
                         
                         <!-- Mapa -->
                         <div class="col-md-7">
-                            <label class="form-label fw-bold">Desenhe a área do talhão</label>
+                            <label class="form-label fw-bold">
+                                <i class="bi bi-map-fill text-success me-1"></i> Desenhe a área do talhão
+                            </label>
                             <div id="map"></div>
-                            <small class="text-muted">Use as ferramentas no lado esquerdo do mapa para desenhar ou editar o polígono. A área será calculada automaticamente.</small>
+                            <small class="text-muted d-block">
+                                <i class="bi bi-info-circle me-1"></i> Use o botão de <strong>Polígono</strong> no canto superior esquerdo do mapa para delimitar o talhão. A área em m² será calculada automaticamente.
+                            </small>
                         </div>
                     </div>
 
                     <div class="d-flex justify-content-between mt-4 border-top pt-3">
                         <button type="button" class="btn btn-outline-secondary" onclick="window.history.back();">Cancelar</button>
-                        <button type="submit" class="btn btn-success">Salvar</button>
+                        <button type="submit" class="btn btn-success px-4">
+                            <i class="bi bi-check-circle-fill me-1"></i> Salvar Talhão
+                        </button>
                     </div>
                 </form>
             </div>
@@ -73,19 +79,18 @@
 
 <script>
     document.addEventListener("DOMContentLoaded", function() {
-        // Inicializa mapa nas coordenadas salvas da propriedade do usuário
-        var defaultLat = {{ request.user.perfil.latitude_propriedade|stringformat:'f'|default:"-5.8958" }};
-        var defaultLng = {{ request.user.perfil.longitude_propriedade|stringformat:'f'|default:"-35.7633" }};
+        var defaultLat = {{ default_lat|stringformat:'f'|default:"-5.8958" }};
+        var defaultLng = {{ default_lng|stringformat:'f'|default:"-35.7633" }};
         var map = L.map('map').setView([defaultLat, defaultLng], 15);
 
-        // Adiciona camada de Satélite Híbrido (Google Maps)
+        // Satélite Híbrido Google Maps
         L.tileLayer('https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
             maxZoom: 20,
             subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
             attribution: '&copy; Google Maps'
         }).addTo(map);
 
-        // Adiciona controles do Geoman
+        // Controles Geoman
         map.pm.addControls({
             position: 'topleft',
             drawMarker: false,
@@ -101,71 +106,93 @@
             drawPolygon: true,
         });
 
-        var inputCoordenadas = document.getElementById('id_coordenadas');
+        var inputCoordenadas = document.getElementById('id_coordenadas_json') || document.getElementById('id_coordenadas');
         var inputArea = document.getElementById('id_area_m2');
+        var selectPropriedade = document.getElementById('id_propriedade');
+
         var drawnItems = new L.FeatureGroup();
         map.addLayer(drawnItems);
         
-        // --- Exibição de Talhões Existentes ---
         var existentesGroup = new L.FeatureGroup();
-        var geojsonExistentesArray = []; // Para validação de sobreposição
+        map.addLayer(existentesGroup);
+        var geojsonExistentesArray = [];
+
+        var propriedadesMap = {};
+        try {
+            var rawProp = '{{ propriedades_map_json|default:"{}"|escapejs }}';
+            if (rawProp) propriedadesMap = JSON.parse(rawProp);
+        } catch (e) {
+            console.error("Erro ao fazer parse das propriedades:", e);
+        }
 
         var talhoesExistentes = [];
         try {
             var rawJson = '{{ talhoes_existentes_json|default:"[]"|escapejs }}';
-            if (rawJson) {
-                talhoesExistentes = JSON.parse(rawJson);
-            }
+            if (rawJson) talhoesExistentes = JSON.parse(rawJson);
         } catch (e) {
             console.error("Erro ao fazer parse dos talhões existentes:", e);
         }
 
-        if (talhoesExistentes && talhoesExistentes.length > 0) {
-            talhoesExistentes.forEach(function(t) {
-                if (t.geojson) {
-                    try {
-                        var parsed = typeof t.geojson === 'string' ? JSON.parse(t.geojson) : t.geojson;
-                        
-                        // Garante que é um objeto geojson válido
-                        if (parsed && Object.keys(parsed).length > 0) {
-                            geojsonExistentesArray.push(parsed);
+        function renderExistentes(selectedPropId) {
+            existentesGroup.clearLayers();
+            geojsonExistentesArray = [];
 
-                            var layer = L.geoJSON(parsed, {
-                                style: { color: '#aaaaaa', weight: 2, fillOpacity: 0.2, dashArray: '5, 5' },
-                                interactive: true,
-                                coordsToLatLng: function(coords) {
-                                    if (coords[0] > -30 && coords[1] < -30) return new L.LatLng(coords[0], coords[1]);
-                                    return new L.LatLng(coords[1], coords[0]);
+            if (talhoesExistentes && talhoesExistentes.length > 0) {
+                talhoesExistentes.forEach(function(t) {
+                    // Filtra apenas talhões da propriedade selecionada se informada
+                    if (!selectedPropId || String(t.propriedade_id) === String(selectedPropId)) {
+                        if (t.geojson) {
+                            try {
+                                var parsed = typeof t.geojson === 'string' ? JSON.parse(t.geojson) : t.geojson;
+                                if (parsed && Object.keys(parsed).length > 0) {
+                                    geojsonExistentesArray.push(parsed);
+
+                                    var layer = L.geoJSON(parsed, {
+                                        style: { color: '#aaaaaa', weight: 2, fillOpacity: 0.2, dashArray: '5, 5' },
+                                        interactive: true,
+                                        coordsToLatLng: function(coords) {
+                                            if (coords[0] > -30 && coords[1] < -30) return new L.LatLng(coords[0], coords[1]);
+                                            return new L.LatLng(coords[1], coords[0]);
+                                        }
+                                    });
+                                    layer.bindTooltip(t.nome, {className: 'bg-light text-dark fw-bold'});
+                                    layer.eachLayer(function(l) { l.options.pmIgnore = true; });
+                                    existentesGroup.addLayer(layer);
                                 }
-                            });
-                            layer.bindTooltip(t.nome, {className: 'bg-light text-dark fw-bold'});
-                            
-                            // Geoman ignora essas camadas
-                            layer.eachLayer(function(l) {
-                                l.options.pmIgnore = true;
-                            });
-
-                            existentesGroup.addLayer(layer);
+                            } catch (e) {
+                                console.error("Erro ao carregar talhão existente:", t.nome, e);
+                            }
                         }
-                    } catch (e) {
-                        console.error("Erro ao carregar talhão existente:", t.nome, e);
+                    }
+                });
+            }
+        }
+
+        // Renderiza existentes da propriedade inicial
+        var initialPropId = selectPropriedade ? selectPropriedade.value : null;
+        renderExistentes(initialPropId);
+
+        // Quando o usuário troca a propriedade selecionada
+        if (selectPropriedade) {
+            selectPropriedade.addEventListener('change', function() {
+                var propId = this.value;
+                renderExistentes(propId);
+
+                if (propriedadesMap[propId]) {
+                    var p = propriedadesMap[propId];
+                    if (drawnItems.getLayers().length === 0) {
+                        if (existentesGroup.getLayers().length > 0) {
+                            map.fitBounds(existentesGroup.getBounds(), {padding: [30, 30], maxZoom: 16});
+                        } else {
+                            map.setView([p.lat, p.lng], 15);
+                        }
                     }
                 }
             });
-            
-            if (existentesGroup.getLayers().length > 0) {
-                map.addLayer(existentesGroup);
-                
-                // Ajusta mapa se for um novo talhão (input vazio)
-                if (!inputCoordenadas.value) {
-                    map.fitBounds(existentesGroup.getBounds(), {padding: [20, 20], maxZoom: 16});
-                }
-            }
         }
-        // --------------------------------------
 
         // Carrega polígono se estiver editando
-        if (inputCoordenadas.value) {
+        if (inputCoordenadas && inputCoordenadas.value) {
             try {
                 var geojsonData = JSON.parse(inputCoordenadas.value);
                 var geojsonLayer = L.geoJSON(geojsonData, {
@@ -178,10 +205,12 @@
                 geojsonLayer.eachLayer(function(layer) {
                     drawnItems.addLayer(layer);
                 });
-                map.fitBounds(drawnItems.getBounds());
+                map.fitBounds(drawnItems.getBounds(), {padding: [30, 30]});
             } catch (e) {
                 console.error("Erro ao carregar coordenadas", e);
             }
+        } else if (existentesGroup.getLayers().length > 0) {
+            map.fitBounds(existentesGroup.getBounds(), {padding: [30, 30], maxZoom: 16});
         }
         
         function checkOverlap(newGeojson) {
@@ -199,42 +228,35 @@
             return hasOverlap;
         }
 
-        // Função para atualizar inputs quando polígono muda
         function updateInputs() {
             var layers = drawnItems.getLayers();
             if (layers.length > 0) {
-                // Pega a primeira camada (assume um polígono por talhão)
                 var layer = layers[0];
                 var geojson = layer.toGeoJSON();
                 
-                // Validação de Sobreposição
                 if (checkOverlap(geojson)) {
-                    alert("Atenção: O polígono desenhado sobrepõe um talhão já existente! Por favor, ajuste os limites.");
+                    alert("Atenção: O polígono desenhado sobrepõe um talhão já existente nesta propriedade! Por favor, ajuste os limites.");
                     layer.setStyle({color: 'red', fillColor: 'red'});
                 } else {
                     layer.setStyle({color: '#00ff00', fillColor: '#00ff00'});
                 }
 
-                inputCoordenadas.value = JSON.stringify(geojson);
+                if (inputCoordenadas) inputCoordenadas.value = JSON.stringify(geojson);
 
-                // Calcula área com Turf.js
                 var areaSqMeters = turf.area(geojson);
-                inputArea.value = areaSqMeters.toFixed(2);
+                if (inputArea) inputArea.value = areaSqMeters.toFixed(2);
             } else {
-                inputCoordenadas.value = '';
-                inputArea.value = '';
+                if (inputCoordenadas) inputCoordenadas.value = '';
+                if (inputArea) inputArea.value = '';
             }
         }
 
-        // Eventos do Geoman
         map.on('pm:create', function(e) {
-            // Se já houver um polígono, remove (limita a 1 polígono)
             drawnItems.clearLayers();
             e.layer.setStyle({color: '#00ff00', weight: 3});
             drawnItems.addLayer(e.layer);
             updateInputs();
 
-            // Adiciona eventos de edição na nova camada
             e.layer.on('pm:edit', updateInputs);
         });
 
@@ -243,7 +265,6 @@
             updateInputs();
         });
 
-        // Eventos de edição para camadas já existentes
         drawnItems.on('pm:edit', updateInputs);
     });
 </script>

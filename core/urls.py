@@ -6,6 +6,12 @@ urlpatterns = [
     path('signup/', views.signup, name='signup'),
     path('configurar-propriedade/', views.configurar_propriedade, name='configurar_propriedade'),
     
+    # Propriedades
+    path('propriedades/', views.PropriedadeListView.as_view(), name='propriedade_list'),
+    path('propriedades/nova/', views.PropriedadeCreateView.as_view(), name='propriedade_create'),
+    path('propriedades/<int:pk>/editar/', views.PropriedadeUpdateView.as_view(), name='propriedade_update'),
+    path('propriedades/<int:pk>/excluir/', views.PropriedadeDeleteView.as_view(), name='propriedade_delete'),
+    
     path('talhoes/', views.TalhaoListView.as_view(), name='talhao_list'),
     path('talhoes/novo/', views.TalhaoCreateView.as_view(), name='talhao_create'),
     path('talhoes/<int:pk>/dashboard/', views.talhao_dashboard, name='talhao_dashboard'),
