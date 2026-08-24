@@ -3,20 +3,50 @@ from django.urls import reverse_lazy
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView, TemplateView
 from django.contrib.auth.forms import UserCreationForm
-from .models import Talhao, Plantio, Manejo, Irrigacao, Ocorrencia
-from .forms import TalhaoForm, PlantioForm, ManejoForm, IrrigacaoForm, OcorrenciaForm
+from django.contrib.auth.decorators import login_required
+from django.views.decorators.http import require_POST
+from django.contrib import messages
+from django.db import transaction
+from decimal import Decimal
+import json
+from .models import Talhao, Plantio, Manejo, Irrigacao, Ocorrencia, PerfilUsuario
+from .forms import TalhaoForm, PlantioForm, ManejoForm, IrrigacaoForm, OcorrenciaForm, PerfilUsuarioForm
 from django.contrib.auth import login
+
 
 def signup(request):
     if request.method == 'POST':
         form = UserCreationForm(request.POST)
         if form.is_valid():
             user = form.save()
+            PerfilUsuario.objects.get_or_create(usuario=user)
             login(request, user)
-            return redirect('dashboard')
+            messages.success(request, 'Conta criada com sucesso! Configure a localização da sua propriedade.')
+            return redirect('configurar_propriedade')
     else:
         form = UserCreationForm()
     return render(request, 'registration/signup.html', {'form': form})
+
+@login_required
+def configurar_propriedade(request):
+    perfil, _ = PerfilUsuario.objects.get_or_create(usuario=request.user)
+    if request.method == 'POST':
+        form = PerfilUsuarioForm(request.POST, instance=perfil)
+        if form.is_valid():
+            perfil = form.save(commit=False)
+            perfil.propriedade_configurada = True
+            perfil.save()
+            messages.success(request, 'Localização da propriedade configurada com sucesso!')
+            return redirect('dashboard')
+    else:
+        form = PerfilUsuarioForm(instance=perfil)
+
+    return render(request, 'core/configurar_propriedade.html', {
+        'form': form,
+        'perfil': perfil,
+        'is_onboarding': not perfil.propriedade_configurada
+    })
+
 
 class DashboardView(LoginRequiredMixin, TemplateView):
     template_name = 'core/dashboard.html'
@@ -404,3 +434,126 @@ class OcorrenciaCreateView(LoginRequiredMixin, CreateView):
         context = super().get_context_data(**kwargs)
         context['title'] = 'Registrar Ocorrência'
         return context
+
+@login_required
+def talhao_dashboard(request, pk):
+    talhao = get_object_or_404(Talhao, pk=pk, usuario=request.user)
+    todos_talhoes = Talhao.objects.filter(usuario=request.user).order_by('nome')
+
+    # Plantio ativo ou em andamento
+    plantio_ativo = Plantio.objects.filter(
+        talhao=talhao,
+        status__in=['ATIVO', 'PREPARO', 'COLHEITA']
+    ).order_by('-id').first()
+
+    # Histórico de plantios neste talhão
+    plantios_historico = Plantio.objects.filter(talhao=talhao).order_by('-data_plantio', '-id')
+
+    # Histórico de Manejos, Irrigações e Ocorrências no Talhão
+    manejos = Manejo.objects.filter(plantio__talhao=talhao).select_related('plantio').order_by('-data', '-id')
+    irrigacoes = Irrigacao.objects.filter(plantio__talhao=talhao).select_related('plantio').order_by('-data_hora', '-id')
+    ocorrencias = Ocorrencia.objects.filter(plantio__talhao=talhao).select_related('plantio').order_by('-data', '-id')
+
+    # Contagens e estatísticas de aplicações
+    total_irrigacoes = irrigacoes.count()
+    total_adubacoes = manejos.filter(tipo_operacao__icontains='Adubação').count()
+    total_defensivos = manejos.filter(tipo_operacao__icontains='Pulverização').count() + manejos.filter(tipo_operacao__icontains='Defensivo').count()
+    total_ocorrencias = ocorrencias.count()
+    total_aplicacoes = total_irrigacoes + manejos.count()
+
+    # Linha do tempo unificada de manejos e atividades
+    timeline_manejos = []
+    for m in manejos:
+        badge_class = "bg-primary"
+        icon_class = "bi-gear-fill"
+        tipo_lower = m.tipo_operacao.lower()
+        if "adubação" in tipo_lower:
+            badge_class = "bg-success"
+            icon_class = "bi-droplet-half"
+        elif "pulverização" in tipo_lower or "defensivo" in tipo_lower:
+            badge_class = "bg-danger"
+            icon_class = "bi-shield-shaded"
+        elif "colheita" in tipo_lower:
+            badge_class = "bg-warning text-dark"
+            icon_class = "bi-basket2-fill"
+        elif "poda" in tipo_lower or "capina" in tipo_lower:
+            badge_class = "bg-secondary"
+            icon_class = "bi-scissors"
+
+        timeline_manejos.append({
+            'data': m.data,
+            'data_display': m.data.strftime('%d/%m/%Y'),
+            'tipo_categoria': 'Manejo',
+            'tipo_operacao': m.tipo_operacao,
+            'produto_insumo': m.produto_insumo,
+            'dosagem': m.dosagem_quantidade,
+            'observacoes': m.observacoes,
+            'cultura': m.plantio.cultura if m.plantio else "-",
+            'badge_class': badge_class,
+            'icon_class': icon_class
+        })
+
+    for irr in irrigacoes:
+        timeline_manejos.append({
+            'data': irr.data_hora.date(),
+            'data_display': irr.data_hora.strftime('%d/%m/%Y %H:%M'),
+            'tipo_categoria': 'Irrigação',
+            'tipo_operacao': 'Irrigação',
+            'produto_insumo': f"Lâmina/Volume: {irr.lamina_ou_volume or 'Convencional'}",
+            'dosagem': f"{irr.duracao_minutos} min",
+            'observacoes': irr.observacoes,
+            'cultura': irr.plantio.cultura if irr.plantio else "-",
+            'badge_class': 'bg-info text-dark',
+            'icon_class': 'bi-droplet-fill'
+        })
+
+    timeline_manejos.sort(key=lambda x: x['data'], reverse=True)
+
+    # Cálculo da área em hectares (1 ha = 10.000 m²)
+    area_ha = round(float(talhao.area_m2) / 10000.0, 2)
+
+    # Status textual e classe de badge do talhão
+    if plantio_ativo:
+        if plantio_ativo.status == 'ATIVO':
+            status_display = 'Ativo'
+            status_badge_class = 'bg-success'
+        elif plantio_ativo.status == 'PREPARO':
+            status_display = 'Preparo'
+            status_badge_class = 'bg-warning text-dark'
+        elif plantio_ativo.status == 'COLHEITA':
+            status_display = 'Em Colheita'
+            status_badge_class = 'bg-info text-dark'
+        else:
+            status_display = plantio_ativo.get_status_display()
+            status_badge_class = 'bg-secondary'
+    else:
+        status_display = 'Sem Plantio'
+        status_badge_class = 'bg-secondary'
+
+    # GeoJSON do Talhão para o Leaflet
+    import json
+    talhao_geojson = None
+    if talhao.coordenadas:
+        if isinstance(talhao.coordenadas, dict):
+            talhao_geojson = json.dumps(talhao.coordenadas)
+        else:
+            talhao_geojson = str(talhao.coordenadas)
+
+    context = {
+        'talhao': talhao,
+        'todos_talhoes': todos_talhoes,
+        'plantio_ativo': plantio_ativo,
+        'status_display': status_display,
+        'status_badge_class': status_badge_class,
+        'area_ha': area_ha,
+        'total_irrigacoes': total_irrigacoes,
+        'total_adubacoes': total_adubacoes,
+        'total_defensivos': total_defensivos,
+        'total_ocorrencias': total_ocorrencias,
+        'total_aplicacoes': total_aplicacoes,
+        'timeline_manejos': timeline_manejos,
+        'ocorrencias': ocorrencias,
+        'plantios_historico': plantios_historico,
+        'talhao_geojson': talhao_geojson,
+    }
+    return render(request, 'core/talhao_dashboard.html', context)

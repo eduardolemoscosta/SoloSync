@@ -4,9 +4,11 @@ from . import views
 urlpatterns = [
     path('', views.DashboardView.as_view(), name='dashboard'),
     path('signup/', views.signup, name='signup'),
+    path('configurar-propriedade/', views.configurar_propriedade, name='configurar_propriedade'),
     
     path('talhoes/', views.TalhaoListView.as_view(), name='talhao_list'),
     path('talhoes/novo/', views.TalhaoCreateView.as_view(), name='talhao_create'),
+    path('talhoes/<int:pk>/dashboard/', views.talhao_dashboard, name='talhao_dashboard'),
     path('talhoes/<int:pk>/editar/', views.TalhaoUpdateView.as_view(), name='talhao_update'),
     path('talhoes/<int:pk>/excluir/', views.TalhaoDeleteView.as_view(), name='talhao_delete'),
     

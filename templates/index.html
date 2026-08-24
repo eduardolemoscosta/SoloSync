@@ -33,11 +33,17 @@
                 <div class="position-sticky pt-3">
                     <h4 class="text-center mb-4 d-none d-md-block"><i class="bi bi-tree-fill"></i> AgroGestor</h4>
                     {% if user.is_authenticated %}
-                        <p class="text-center small">Olá, {{ user.username }}</p>
+                        <div class="text-center mb-3">
+                            <p class="small mb-0">Olá, <strong>{{ user.username }}</strong></p>
+                            {% if user.perfil.nome_propriedade %}
+                                <small class="text-white-50"><i class="bi bi-geo-alt"></i> {{ user.perfil.nome_propriedade }}</small>
+                            {% endif %}
+                        </div>
                         <a href="{% url 'dashboard' %}"><i class="bi bi-speedometer2"></i> Dashboard</a>
                         <a href="{% url 'talhao_list' %}"><i class="bi bi-geo-alt"></i> Meus Talhões</a>
                         <a href="{% url 'plantio_list' %}"><i class="bi bi-flower1"></i> Meus Plantios</a>
                         <hr class="text-light">
+                        <a href="{% url 'configurar_propriedade' %}"><i class="bi bi-pin-map"></i> Minha Propriedade</a>
                         <a href="{% url 'manejo_create' %}"><i class="bi bi-tools"></i> Novo Manejo</a>
                         <a href="{% url 'irrigacao_create' %}"><i class="bi bi-droplet"></i> Nova Irrigação</a>
                         <hr class="text-light">
@@ -55,6 +61,16 @@
             </nav>
 
             <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 content-area">
+                {% if user.is_authenticated and not user.perfil.propriedade_configurada and request.resolver_match.url_name != 'configurar_propriedade' %}
+                    <div class="alert alert-warning alert-dismissible fade show mt-3 shadow-sm d-flex flex-wrap align-items-center justify-content-between gap-2" role="alert">
+                        <div>
+                            <i class="bi bi-geo-alt-fill me-1 fs-5"></i>
+                            <strong>Configuração Pendente:</strong> Defina o centro da sua fazenda/propriedade para centralizar automaticamente seus mapas.
+                        </div>
+                        <a href="{% url 'configurar_propriedade' %}" class="btn btn-warning btn-sm fw-bold">Configurar Propriedade</a>
+                    </div>
+                {% endif %}
+
                 {% if messages %}
                     {% for message in messages %}
                         <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show mt-3" role="alert">

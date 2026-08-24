@@ -73,8 +73,10 @@
 
 <script>
     document.addEventListener("DOMContentLoaded", function() {
-        // Inicializa mapa (centralizado em Boa Saúde - RN)
-        var map = L.map('map').setView([-6.1597, -35.6022], 14);
+        // Inicializa mapa nas coordenadas salvas da propriedade do usuário
+        var defaultLat = {{ request.user.perfil.latitude_propriedade|stringformat:'f'|default:"-5.8958" }};
+        var defaultLng = {{ request.user.perfil.longitude_propriedade|stringformat:'f'|default:"-35.7633" }};
+        var map = L.map('map').setView([defaultLat, defaultLng], 15);
 
         // Adiciona camada de Satélite Híbrido (Google Maps)
         L.tileLayer('https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {

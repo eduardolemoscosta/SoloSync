@@ -132,7 +132,9 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
     document.addEventListener("DOMContentLoaded", function() {
-        var map = L.map('mapPlantios').setView([-6.1597, -35.6022], 14);
+        var defaultLat = {{ request.user.perfil.latitude_propriedade|stringformat:'f'|default:"-5.8958" }};
+        var defaultLng = {{ request.user.perfil.longitude_propriedade|stringformat:'f'|default:"-35.7633" }};
+        var map = L.map('mapPlantios').setView([defaultLat, defaultLng], 14);
         
         L.tileLayer('https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
             maxZoom: 20,

@@ -1,0 +1,567 @@
+{% extends 'index.html' %}
+
+{% block title %}Dashboard do Talhão: {{ talhao.nome }} - Gestão Agrícola{% endblock %}
+
+{% block content %}
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+<style>
+    .kpi-card {
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        border-radius: 10px;
+    }
+    .kpi-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+    }
+    #mapTalhao {
+        height: 380px;
+        width: 100%;
+        border-radius: 8px;
+        z-index: 1;
+    }
+    .timeline-icon-box {
+        width: 38px;
+        height: 38px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+    }
+    .nav-tabs .nav-link {
+        font-weight: 500;
+        color: #495057;
+    }
+    .nav-tabs .nav-link.active {
+        font-weight: 600;
+        color: #198754;
+        border-bottom: 3px solid #198754;
+    }
+    .custom-map-popup {
+        font-size: 13px;
+        line-height: 1.4;
+    }
+</style>
+
+<!-- Cabeçalho com Seletor de Talhão e Ações Rápidas -->
+<div class="d-flex justify-content-between flex-wrap align-items-center pt-3 pb-2 mb-3 border-bottom gap-2">
+    <div class="d-flex align-items-center flex-wrap gap-2">
+        <div class="me-2">
+            <h2 class="h3 mb-0 d-inline align-middle">
+                <i class="bi bi-geo-alt-fill text-success"></i> {{ talhao.nome }}
+            </h2>
+            <span class="badge {{ status_badge_class }} fs-6 ms-2 align-middle">{{ status_display }}</span>
+        </div>
+
+        <!-- Dropdown Seletor de Talhão -->
+        <div class="d-inline-block">
+            <select class="form-select form-select-sm" onchange="if(this.value) window.location.href=this.value;" style="min-width: 200px;">
+                <option disabled>Alternar Talhão...</option>
+                {% for t in todos_talhoes %}
+                    <option value="{% url 'talhao_dashboard' t.id %}" {% if t.id == talhao.id %}selected{% endif %}>
+                        🌾 {{ t.nome }} ({{ t.area_m2 }} m²)
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+
+    <!-- Botões de Ação Rápida -->
+    <div class="d-flex flex-wrap gap-2">
+        <a href="{% url 'talhao_update' talhao.id %}" class="btn btn-outline-secondary btn-sm" title="Editar Talhão">
+            <i class="bi bi-pencil-square"></i> Editar Talhão
+        </a>
+        <a href="{% url 'manejo_create' %}" class="btn btn-outline-primary btn-sm" title="Novo Manejo">
+            <i class="bi bi-tools"></i> Novo Manejo
+        </a>
+        <a href="{% url 'irrigacao_create' %}" class="btn btn-outline-info btn-sm" title="Nova Irrigação">
+            <i class="bi bi-droplet-fill"></i> Nova Irrigação
+        </a>
+        <a href="{% url 'ocorrencia_create' %}" class="btn btn-outline-danger btn-sm" title="Registrar Ocorrência">
+            <i class="bi bi-bug-fill"></i> Nova Ocorrência
+        </a>
+
+        {% if plantio_ativo and plantio_ativo.status == 'ATIVO' or plantio_ativo.status == 'COLHEITA' %}
+            <button type="button" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#modalColherTalhao">
+                <i class="bi bi-basket2-fill"></i> Registrar Colheita
+            </button>
+        {% elif not plantio_ativo %}
+            <a href="{% url 'plantio_create' %}" class="btn btn-success btn-sm">
+                <i class="bi bi-plus-circle-fill"></i> Iniciar Plantio
+            </a>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Grid de Cards de Estatísticas (KPIs Superiores) -->
+<div class="row g-3 mb-4">
+    <!-- Card 1: Área Total -->
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card h-100 border-0 shadow-sm kpi-card border-start border-4 border-success">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="text-muted fw-semibold small text-uppercase">Área Total</span>
+                    <div class="timeline-icon-box bg-success bg-opacity-10 text-success">
+                        <i class="bi bi-bounding-box fs-5"></i>
+                    </div>
+                </div>
+                <h3 class="fw-bold mb-1">{{ talhao.area_m2 }} <small class="text-muted fs-6">m²</small></h3>
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="badge bg-success bg-opacity-10 text-success fw-bold">{{ area_ha }} hectares (ha)</span>
+                    <small class="text-muted">Solo: <strong>{{ talhao.tipo_solo }}</strong></small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Card 2: Cultura Atual -->
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card h-100 border-0 shadow-sm kpi-card border-start border-4 border-primary">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="text-muted fw-semibold small text-uppercase">Cultura Atual</span>
+                    <div class="timeline-icon-box bg-primary bg-opacity-10 text-primary">
+                        <i class="bi bi-flower1 fs-5"></i>
+                    </div>
+                </div>
+                {% if plantio_ativo %}
+                    <h3 class="fw-bold mb-1 text-truncate" title="{{ plantio_ativo.cultura }}">{{ plantio_ativo.cultura }}</h3>
+                    <p class="card-text text-muted small mb-0">
+                        Variedade: <strong>{{ plantio_ativo.variedade|default:"Padrão" }}</strong><br>
+                        Plantio: <strong>{{ plantio_ativo.data_plantio|date:"d/m/Y"|default:"Em preparo" }}</strong>
+                    </p>
+                {% else %}
+                    <h4 class="fw-bold text-secondary mb-1">Sem Plantio</h4>
+                    <p class="card-text text-muted small mb-0">Área disponível para novo cultivo</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Card 3: Progresso do Ciclo -->
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card h-100 border-0 shadow-sm kpi-card border-start border-4 border-warning">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="text-muted fw-semibold small text-uppercase">Progresso do Ciclo</span>
+                    <div class="timeline-icon-box bg-warning bg-opacity-10 text-warning">
+                        <i class="bi bi-hourglass-split fs-5"></i>
+                    </div>
+                </div>
+                {% if plantio_ativo and plantio_ativo.ciclo_dias_estimado %}
+                    <div class="d-flex justify-content-between align-items-baseline mb-1">
+                        <h4 class="fw-bold mb-0">Dia {{ plantio_ativo.dias_decorridos }} <small class="text-muted fs-6">/ {{ plantio_ativo.ciclo_dias_estimado }}d</small></h4>
+                        <span class="fw-bold text-success">{{ plantio_ativo.porcentagem_progresso }}%</span>
+                    </div>
+                    <div class="progress mb-2" style="height: 8px;">
+                        <div class="progress-bar {% if plantio_ativo.porcentagem_progresso >= 100 %}bg-success{% else %}bg-warning{% endif %}" 
+                             role="progressbar" 
+                             style="width: {{ plantio_ativo.porcentagem_progresso }}%;"></div>
+                    </div>
+                    <small class="text-muted">
+                        {% if plantio_ativo.dias_restantes <= 0 %}
+                            <span class="text-success fw-bold"><i class="bi bi-check-circle-fill"></i> Pronto para colheita!</span>
+                        {% else %}
+                            Restam <strong>{{ plantio_ativo.dias_restantes }} dias</strong> até a colheita
+                        {% endif %}
+                    </small>
+                {% elif plantio_ativo and plantio_ativo.status == 'PREPARO' %}
+                    <h5 class="fw-bold text-warning mb-1">Preparo de Solo</h5>
+                    <p class="card-text text-muted small mb-0">Talhão em fase preparatória para plantio</p>
+                {% else %}
+                    <h5 class="fw-bold text-muted mb-1">Inativo</h5>
+                    <p class="card-text text-muted small mb-0">Nenhum ciclo em andamento</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Card 4: Resumo de Manejos e Aplicações -->
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card h-100 border-0 shadow-sm kpi-card border-start border-4 border-info">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="text-muted fw-semibold small text-uppercase">Aplicações & Manejos</span>
+                    <div class="timeline-icon-box bg-info bg-opacity-10 text-info">
+                        <i class="bi bi-clipboard2-pulse-fill fs-5"></i>
+                    </div>
+                </div>
+                <h3 class="fw-bold mb-2">{{ total_aplicacoes }} <small class="text-muted fs-6">intervenções</small></h3>
+                <div class="d-flex flex-wrap gap-1">
+                    <span class="badge bg-success bg-opacity-25 text-dark" title="Adubações">{{ total_adubacoes }} Adubações</span>
+                    <span class="badge bg-danger bg-opacity-25 text-dark" title="Defensivos/Pragas">{{ total_defensivos }} Defensivos</span>
+                    <span class="badge bg-info bg-opacity-25 text-dark" title="Irrigações">{{ total_irrigacoes }} Irrigações</span>
+                    <span class="badge bg-secondary bg-opacity-25 text-dark" title="Ocorrências">{{ total_ocorrencias }} Ocorrências</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Seção do Mapa e Detalhes do Terreno -->
+<div class="row g-3 mb-4">
+    <!-- Mapa Leaflet com Geometria Fixada -->
+    <div class="col-lg-8">
+        <div class="card shadow-sm h-100 border-0">
+            <div class="card-header bg-success text-white d-flex justify-content-between align-items-center py-2">
+                <h5 class="mb-0 fs-6"><i class="bi bi-map-fill me-1"></i> Mapeamento Geográfico do Talhão</h5>
+                <span class="badge bg-white text-success fw-semibold">{{ talhao.nome }}</span>
+            </div>
+            <div class="card-body p-1">
+                <div id="mapTalhao"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Card Lateral de Detalhes do Terreno & Cadastro -->
+    <div class="col-lg-4">
+        <div class="card shadow-sm h-100 border-0">
+            <div class="card-header bg-light py-2">
+                <h5 class="mb-0 fs-6 fw-bold text-secondary"><i class="bi bi-info-circle-fill text-success me-1"></i> Características do Terreno</h5>
+            </div>
+            <div class="card-body">
+                <ul class="list-group list-group-flush mb-3">
+                    <li class="list-group-item d-flex justify-content-between align-items-center px-0 py-2">
+                        <span class="text-muted"><i class="bi bi-layers me-1 text-primary"></i> Tipo de Solo:</span>
+                        <span class="badge bg-primary-subtle text-primary fw-bold">{{ talhao.tipo_solo }}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center px-0 py-2">
+                        <span class="text-muted"><i class="bi bi-bounding-box-circles me-1 text-success"></i> Área Total:</span>
+                        <span class="fw-bold">{{ talhao.area_m2 }} m² ({{ area_ha }} ha)</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center px-0 py-2">
+                        <span class="text-muted"><i class="bi bi-droplet-half me-1 text-info"></i> Registros de Irrigação:</span>
+                        <span class="fw-bold">{{ total_irrigacoes }} sessões</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center px-0 py-2">
+                        <span class="text-muted"><i class="bi bi-pin-map me-1 text-danger"></i> Georreferenciamento:</span>
+                        {% if talhao.coordenadas %}
+                            <span class="badge bg-success"><i class="bi bi-check2"></i> Polígono Ativo</span>
+                        {% else %}
+                            <span class="badge bg-secondary">Não desenhado</span>
+                        {% endif %}
+                    </li>
+                </ul>
+
+                <h6 class="fw-bold text-muted small text-uppercase mb-1"><i class="bi bi-card-text me-1"></i> Observações & Notas</h6>
+                <div class="p-2 bg-light rounded border text-muted small" style="min-height: 80px;">
+                    {{ talhao.observacoes|default:"Nenhuma observação geográfica registrada."|linebreaksbr }}
+                </div>
+
+                <div class="mt-3 text-end">
+                    <a href="{% url 'talhao_update' talhao.id %}" class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-pencil"></i> Atualizar Dados
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Abas de Histórico e Linha do Tempo (Tabs Bootstrap 5) -->
+<div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-white border-bottom-0 pt-3">
+        <ul class="nav nav-tabs card-header-tabs" id="talhaoDashboardTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="manejos-tab" data-bs-toggle="tab" data-bs-target="#tab-manejos" type="button" role="tab" aria-controls="tab-manejos" aria-selected="true">
+                    <i class="bi bi-journal-medical me-1"></i> Linha do Tempo de Manejos ({{ timeline_manejos|length }})
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="ocorrencias-tab" data-bs-toggle="tab" data-bs-target="#tab-ocorrencias" type="button" role="tab" aria-controls="tab-ocorrencias" aria-selected="false">
+                    <i class="bi bi-bug me-1"></i> Ocorrências e Pragas ({{ ocorrencias|length }})
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="plantios-tab" data-bs-toggle="tab" data-bs-target="#tab-plantios" type="button" role="tab" aria-controls="tab-plantios" aria-selected="false">
+                    <i class="bi bi-clock-history me-1"></i> Histórico de Plantios & Colheitas ({{ plantios_historico|length }})
+                </button>
+            </li>
+        </ul>
+    </div>
+
+    <div class="card-body">
+        <div class="tab-content" id="talhaoDashboardTabsContent">
+            <!-- Aba 1: Linha do Tempo de Manejos e Irrigações -->
+            <div class="tab-pane fade show active" id="tab-manejos" role="tabpanel" aria-labelledby="manejos-tab">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6 class="mb-0 fw-bold text-secondary">Aplicações, Irrigações e Tratos no Talhão</h6>
+                    <div class="d-flex gap-2">
+                        <a href="{% url 'manejo_create' %}" class="btn btn-sm btn-outline-success">
+                            <i class="bi bi-plus-lg"></i> Novo Manejo
+                        </a>
+                        <a href="{% url 'irrigacao_create' %}" class="btn btn-sm btn-outline-info">
+                            <i class="bi bi-plus-lg"></i> Nova Irrigação
+                        </a>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 120px;">Data</th>
+                                <th>Operação / Categoria</th>
+                                <th>Produto / Insumo</th>
+                                <th>Dosagem / Duração</th>
+                                <th>Cultura Associada</th>
+                                <th>Observações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in timeline_manejos %}
+                            <tr>
+                                <td>
+                                    <span class="badge bg-light text-dark border">{{ item.data_display }}</span>
+                                </td>
+                                <td>
+                                    <span class="badge {{ item.badge_class }}">
+                                        <i class="bi {{ item.icon_class }} me-1"></i>{{ item.tipo_operacao }}
+                                    </span>
+                                </td>
+                                <td><strong>{{ item.produto_insumo }}</strong></td>
+                                <td>{{ item.dosagem }}</td>
+                                <td><span class="badge bg-secondary-subtle text-secondary">{{ item.cultura }}</span></td>
+                                <td class="text-muted small">{{ item.observacoes|default:"-" }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="6" class="text-center py-4 text-muted">
+                                    <i class="bi bi-info-circle fs-4 d-block mb-1"></i>
+                                    Nenhum registro de manejo ou irrigação cadastrado para este talhão.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Aba 2: Ocorrências e Pragas -->
+            <div class="tab-pane fade" id="tab-ocorrencias" role="tabpanel" aria-labelledby="ocorrencias-tab">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6 class="mb-0 fw-bold text-secondary">Registro de Pragas, Doenças e Diagnósticos</h6>
+                    <a href="{% url 'ocorrencia_create' %}" class="btn btn-sm btn-outline-danger">
+                        <i class="bi bi-plus-lg"></i> Registrar Ocorrência
+                    </a>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 120px;">Data</th>
+                                <th>Tipo de Ocorrência</th>
+                                <th>Cultura</th>
+                                <th>Diagnóstico / Descrição</th>
+                                <th>Ação Tomada / Solução</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for oc in ocorrencias %}
+                            <tr>
+                                <td><span class="badge bg-light text-dark border">{{ oc.data|date:"d/m/Y" }}</span></td>
+                                <td>
+                                    {% if oc.tipo == 'Praga' %}
+                                        <span class="badge bg-danger"><i class="bi bi-bug-fill me-1"></i> {{ oc.tipo }}</span>
+                                    {% elif oc.tipo == 'Doença' %}
+                                        <span class="badge bg-warning text-dark"><i class="bi bi-virus me-1"></i> {{ oc.tipo }}</span>
+                                    {% elif oc.tipo == 'Deficiência Nutricional' %}
+                                        <span class="badge bg-info text-dark"><i class="bi bi-exclamation-triangle-fill me-1"></i> {{ oc.tipo }}</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary"><i class="bi bi-question-circle me-1"></i> {{ oc.tipo }}</span>
+                                    {% endif %}
+                                </td>
+                                <td><strong>{{ oc.plantio.cultura }}</strong></td>
+                                <td>{{ oc.descricao }}</td>
+                                <td>
+                                    {% if oc.acao_tomada %}
+                                        <span class="text-success"><i class="bi bi-check2-circle"></i> {{ oc.acao_tomada }}</span>
+                                    {% else %}
+                                        <span class="text-muted fst-italic">Pendente de intervenção</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="5" class="text-center py-4 text-muted">
+                                    <i class="bi bi-shield-check fs-4 text-success d-block mb-1"></i>
+                                    Nenhuma ocorrência ou praga registrada neste talhão.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Aba 3: Histórico de Plantios e Colheitas -->
+            <div class="tab-pane fade" id="tab-plantios" role="tabpanel" aria-labelledby="plantios-tab">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6 class="mb-0 fw-bold text-secondary">Cultivos Anteriores e Safra Atual no Talhão</h6>
+                    <a href="{% url 'plantio_create' %}" class="btn btn-sm btn-outline-success">
+                        <i class="bi bi-plus-lg"></i> Novo Plantio
+                    </a>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Cultura</th>
+                                <th>Variedade</th>
+                                <th>Data Início</th>
+                                <th>Previsão / Finalização</th>
+                                <th>Ciclo Estimado</th>
+                                <th>Status</th>
+                                <th class="text-end">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for p in plantios_historico %}
+                            <tr>
+                                <td><strong>{{ p.cultura }}</strong></td>
+                                <td>{{ p.variedade|default:"-" }}</td>
+                                <td>{{ p.data_plantio|date:"d/m/Y"|default:"-" }}</td>
+                                <td>{{ p.data_prevista_colheita|date:"d/m/Y"|default:"-" }}</td>
+                                <td>{{ p.ciclo_dias_estimado }} dias</td>
+                                <td>
+                                    {% if p.status == 'ATIVO' %}
+                                        <span class="badge bg-success">Ativo</span>
+                                    {% elif p.status == 'COLHEITA' %}
+                                        <span class="badge bg-info text-dark">Em Colheita</span>
+                                    {% elif p.status == 'PREPARO' %}
+                                        <span class="badge bg-warning text-dark">Preparo</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Finalizado</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end">
+                                    <a href="{% url 'plantio_detail' p.id %}" class="btn btn-sm btn-outline-primary" title="Ver Detalhes">
+                                        <i class="bi bi-eye"></i> Detalhes
+                                    </a>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="7" class="text-center py-4 text-muted">
+                                    <i class="bi bi-clock fs-4 d-block mb-1"></i>
+                                    Nenhum plantio registrado até o momento para este talhão.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Colher Talhão (se houver plantio ativo) -->
+{% if plantio_ativo and plantio_ativo.status == 'ATIVO' or plantio_ativo.status == 'COLHEITA' %}
+<div class="modal fade" id="modalColherTalhao" tabindex="-1" aria-labelledby="modalColherTalhaoLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" action="{% url 'plantio_colher' plantio_ativo.id %}">
+                {% csrf_token %}
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title" id="modalColherTalhaoLabel">
+                        <i class="bi bi-basket2-fill me-1"></i> Registrar Colheita: {{ plantio_ativo.cultura }}
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Data da Colheita</label>
+                        <input type="date" name="data_colheita" class="form-control" value="{% now 'Y-m-d' %}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Quantidade Colhida / Produtividade</label>
+                        <input type="text" name="quantidade" class="form-control" placeholder="Ex: 1.200 kg, 45 sacas, 2.5 ton..." required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Destino do Talhão após a Colheita</label>
+                        <select name="destino_talhao" class="form-select" required>
+                            <option value="FINALIZADO" selected>Finalizar Plantio (Liberar talhão para nova cultura)</option>
+                            <option value="COLHEITA">Manter em colheita contínua (múltiplas etapas)</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Observações da Colheita</label>
+                        <textarea name="observacoes" class="form-control" rows="2" placeholder="Qualidade dos frutos/grãos, perdas climáticas, rendimento..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-success">Confirmar e Salvar Colheita</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Leaflet JS & Inicialização do Mapa -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        var defaultLat = {{ request.user.perfil.latitude_propriedade|stringformat:'f'|default:"-5.8958" }};
+        var defaultLng = {{ request.user.perfil.longitude_propriedade|stringformat:'f'|default:"-35.7633" }};
+        var map = L.map('mapTalhao').setView([defaultLat, defaultLng], 14);
+
+        // Satélite Google Maps
+        L.tileLayer('https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+            maxZoom: 20,
+            subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+            attribution: '&copy; Google Maps'
+        }).addTo(map);
+
+        var geojsonRaw = '{{ talhao_geojson|default:""|escapejs }}';
+        var talhaoNome = '{{ talhao.nome|escapejs }}';
+        var talhaoArea = '{{ talhao.area_m2|escapejs }}';
+        var talhaoSolo = '{{ talhao.tipo_solo|escapejs }}';
+        var culturaAtual = '{{ plantio_ativo.cultura|default:"Sem plantio ativo"|escapejs }}';
+
+        if (geojsonRaw) {
+            try {
+                var geojsonData = JSON.parse(geojsonRaw);
+                if (geojsonData && Object.keys(geojsonData).length > 0) {
+                    var talhaoLayer = L.geoJSON(geojsonData, {
+                        style: {
+                            color: '#00ff00',
+                            weight: 3,
+                            fillColor: '#28a745',
+                            fillOpacity: 0.4
+                        },
+                        coordsToLatLng: function(coords) {
+                            if (coords[0] > -30 && coords[1] < -30) {
+                                return new L.LatLng(coords[0], coords[1]);
+                            }
+                            return new L.LatLng(coords[1], coords[0]);
+                        }
+                    }).addTo(map);
+
+                    var popupContent = `
+                        <div class="custom-map-popup p-1">
+                            <h6 class="text-success fw-bold mb-1"><i class="bi bi-geo-alt-fill"></i> ${talhaoNome}</h6>
+                            <hr class="my-1">
+                            <div><strong>Área:</strong> ${talhaoArea} m²</div>
+                            <div><strong>Solo:</strong> ${talhaoSolo}</div>
+                            <div><strong>Cultura:</strong> ${culturaAtual}</div>
+                        </div>
+                    `;
+
+                    talhaoLayer.bindPopup(popupContent);
+                    talhaoLayer.bindTooltip(`<strong>${talhaoNome}</strong> (${talhaoArea} m²)`, { sticky: true });
+
+                    map.fitBounds(talhaoLayer.getBounds(), { padding: [40, 40] });
+                }
+            } catch (e) {
+                console.error("Erro ao renderizar GeoJSON do talhão:", e);
+            }
+        }
+    });
+</script>
+{% endblock %}

@@ -49,13 +49,16 @@
                     <td>{{ talhao.area_m2 }}</td>
                     <td>{{ talhao.tipo_solo }}</td>
                     <td class="text-end">
-                        <button type="button" class="btn btn-sm btn-outline-primary btn-dividir" 
+                        <a href="{% url 'talhao_dashboard' talhao.id %}" class="btn btn-sm btn-success me-1" title="Dashboard do Talhão">
+                            <i class="bi bi-speedometer2"></i> Dashboard
+                        </a>
+                        <button type="button" class="btn btn-sm btn-outline-primary btn-dividir me-1" 
                                 data-id="{{ talhao.id }}" 
                                 data-nome="{{ talhao.nome }}" 
                                 data-area="{{ talhao.area_m2|stringformat:'f' }}">
                             <i class="bi bi-layout-split"></i> Dividir
                         </button>
-                        <a href="{% url 'talhao_update' talhao.id %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil"></i></a>
+                        <a href="{% url 'talhao_update' talhao.id %}" class="btn btn-sm btn-outline-secondary me-1"><i class="bi bi-pencil"></i></a>
                         <a href="{% url 'talhao_delete' talhao.id %}" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></a>
                     </td>
                 </tr>
@@ -154,7 +157,9 @@
 <script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.js"></script>
 <script>
     document.addEventListener("DOMContentLoaded", function() {
-        var map = L.map('mapAll').setView([-6.1597, -35.6022], 14);
+        var defaultLat = {{ request.user.perfil.latitude_propriedade|stringformat:'f'|default:"-5.8958" }};
+        var defaultLng = {{ request.user.perfil.longitude_propriedade|stringformat:'f'|default:"-35.7633" }};
+        var map = L.map('mapAll').setView([defaultLat, defaultLng], 14);
         
         L.tileLayer('https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
             maxZoom: 20,

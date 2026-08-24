@@ -1,5 +1,16 @@
 from django import forms
-from .models import Talhao, Plantio, Manejo, Irrigacao, Ocorrencia
+from .models import PerfilUsuario, Talhao, Plantio, Manejo, Irrigacao, Ocorrencia
+
+class PerfilUsuarioForm(forms.ModelForm):
+    class Meta:
+        model = PerfilUsuario
+        fields = ['nome_propriedade', 'latitude_propriedade', 'longitude_propriedade']
+        widgets = {
+            'nome_propriedade': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Fazenda Boa Esperança'}),
+            'latitude_propriedade': forms.NumberInput(attrs={'class': 'form-control', 'step': 'any', 'id': 'id_latitude'}),
+            'longitude_propriedade': forms.NumberInput(attrs={'class': 'form-control', 'step': 'any', 'id': 'id_longitude'}),
+        }
+
 
 class TalhaoForm(forms.ModelForm):
     class Meta:

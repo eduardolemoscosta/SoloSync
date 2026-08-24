@@ -2,6 +2,28 @@ from django.db import models
 from django.contrib.auth.models import User
 from datetime import date, timedelta
 from django.utils import timezone
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+
+class PerfilUsuario(models.Model):
+    usuario = models.OneToOneField(User, on_delete=models.CASCADE, related_name='perfil')
+    nome_propriedade = models.CharField('Nome da Propriedade', max_length=150, blank=True, null=True)
+    latitude_propriedade = models.FloatField('Latitude', default=-5.8958)  # Coordenada padrão de fallback
+    longitude_propriedade = models.FloatField('Longitude', default=-35.7633) # Coordenada padrão de fallback
+    propriedade_configurada = models.BooleanField('Propriedade Configurada', default=False)
+
+    def __str__(self):
+        return f"Perfil de {self.usuario.username}"
+
+@receiver(post_save, sender=User)
+def criar_perfil_usuario(sender, instance, created, **kwargs):
+    if created:
+        PerfilUsuario.objects.get_or_create(usuario=instance)
+    else:
+        # Garante que mesmo usuários criados antes tenham perfil
+        if not hasattr(instance, 'perfil'):
+            PerfilUsuario.objects.get_or_create(usuario=instance)
+
 
 class Talhao(models.Model):
     TIPO_SOLO_CHOICES = [
