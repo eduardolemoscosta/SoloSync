@@ -32,9 +32,7 @@ $ cd gestao_agricola
 
 # Crie e ative um ambiente virtual (Recomendado)
 $ python -m venv venv
-$ venv\Scripts\activate   # No Windows
-# ou
-$ source venv/bin/activate # No Linux/Mac
+$ venv\Scripts\activate
 
 # Instale as dependências do projeto
 $ pip install -r requirements.txt
