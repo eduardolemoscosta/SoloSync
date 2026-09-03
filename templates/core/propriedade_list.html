@@ -1,4 +1,5 @@
 {% extends 'index.html' %}
+{% load l10n %}
 
 {% block title %}Minhas Propriedades - Gestão Agrícola{% endblock %}
 
@@ -105,15 +106,8 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
     document.addEventListener("DOMContentLoaded", function() {
-        var propriedades = [];
-        try {
-            var rawJson = '{{ propriedades_json|default:"[]"|escapejs }}';
-            if (rawJson) propriedades = JSON.parse(rawJson);
-        } catch(e) {
-            console.error("Erro ao processar JSON de propriedades:", e);
-        }
-
-        if (propriedades.length > 0) {
+        var mapContainer = document.getElementById('mapPropriedades');
+        if (mapContainer) {
             var map = L.map('mapPropriedades');
             
             L.tileLayer('https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
@@ -122,28 +116,44 @@
                 attribution: '&copy; Google Maps'
             }).addTo(map);
 
-            var bounds = [];
-            propriedades.forEach(function(p) {
-                if (p.lat && p.lng) {
-                    var marker = L.marker([p.lat, p.lng]).addTo(map);
-                    var popupContent = '<b>' + p.nome + '</b>';
-                    if (p.cidade || p.estado) {
-                        popupContent += '<br>' + p.cidade + (p.estado ? ' - ' + p.estado : '');
-                    }
-                    if (p.area_ha && p.area_ha !== '0') {
-                        popupContent += '<br>Área: ' + p.area_ha + ' ha';
-                    }
-                    popupContent += '<br><a href="/talhoes/?propriedade=' + p.id + '" class="btn btn-sm btn-success mt-2 py-0">Ver ' + p.talhoes_count + ' talhões</a>';
-                    
-                    marker.bindPopup(popupContent);
-                    bounds.push([p.lat, p.lng]);
-                }
-            });
+            // Cria um featureGroup para armazenar os polígonos e ajustar o zoom da câmera no final
+            const propriedadesLayer = L.featureGroup().addTo(map);
 
-            if (bounds.length === 1) {
-                map.setView(bounds[0], 14);
-            } else if (bounds.length > 1) {
-                map.fitBounds(bounds, { padding: [40, 40] });
+            // Itera sobre as propriedades enviadas pela view do Django
+            {% for propriedade in propriedades %}
+                {% if propriedade.contorno_geojson %}
+                    // Recupera o GeoJSON salvo no banco
+                    const geojsonData = {{ propriedade.contorno_geojson|safe }};
+                    
+                    // Desenha o polígono no mapa com estilo de demarcação (verde)
+                    const propriedadePoligono = L.geoJSON(geojsonData, {
+                        style: {
+                            color: '#198754', // Verde Bootstrap
+                            weight: 3,
+                            fillColor: '#198754',
+                            fillOpacity: 0.15
+                        },
+                        coordsToLatLng: function(coords) {
+                            if (coords[0] > -30 && coords[1] < -30) return new L.LatLng(coords[0], coords[1]);
+                            return new L.LatLng(coords[1], coords[0]);
+                        }
+                    });
+                    
+                    // Adiciona um popup com os dados principais da terra
+                    propriedadePoligono.bindPopup("<b>{{ propriedade.nome }}</b><br>Área: {{ propriedade.area_total_ha|default:'Não informada' }} ha<br><a href='{% url 'talhao_list' %}?propriedade={{ propriedade.id }}' class='btn btn-sm btn-success mt-2 py-0'>Ver talhões</a>");
+                    propriedadePoligono.addTo(propriedadesLayer);
+                    
+                {% elif propriedade.latitude_sede and propriedade.longitude_sede %}
+                    // Fallback: se a propriedade for antiga e só tiver o ponto GPS, desenha o pino
+                    const marker = L.marker([{{ propriedade.latitude_sede|unlocalize }}, {{ propriedade.longitude_sede|unlocalize }}])
+                        .bindPopup("<b>{{ propriedade.nome }}</b><br><a href='{% url 'talhao_list' %}?propriedade={{ propriedade.id }}' class='btn btn-sm btn-success mt-2 py-0'>Ver talhões</a>")
+                        .addTo(propriedadesLayer);
+                {% endif %}
+            {% endfor %}
+
+            // Ajusta a câmera do mapa automaticamente para englobar todas as propriedades desenhadas na tela
+            if (propriedadesLayer.getLayers().length > 0) {
+                map.fitBounds(propriedadesLayer.getBounds(), { padding: [20, 20] });
             } else {
                 map.setView([-5.8958, -35.7633], 12);
             }

@@ -243,13 +243,18 @@ class TalhaoCreateView(LoginRequiredMixin, CreateView):
         
         user_props = Propriedade.objects.filter(usuario=self.request.user)
         propriedades_map = {}
+        propriedades_geojson = {}
         for p in user_props:
             propriedades_map[str(p.id)] = {
                 'lat': p.latitude_sede,
                 'lng': p.longitude_sede,
                 'nome': p.nome
             }
+            if p.contorno_geojson:
+                propriedades_geojson[str(p.id)] = p.contorno_geojson
+                
         context['propriedades_map_json'] = json.dumps(propriedades_map)
+        context['propriedades_json'] = json.dumps(propriedades_geojson)
 
         existentes = Talhao.objects.filter(propriedade__usuario=self.request.user, ativo=True).exclude(coordenadas_json__isnull=True)
         data = [{'nome': t.nome, 'propriedade_id': t.propriedade_id, 'geojson': t.coordenadas_json} for t in existentes]
@@ -288,13 +293,18 @@ class TalhaoUpdateView(LoginRequiredMixin, UpdateView):
         
         user_props = Propriedade.objects.filter(usuario=self.request.user)
         propriedades_map = {}
+        propriedades_geojson = {}
         for p in user_props:
             propriedades_map[str(p.id)] = {
                 'lat': p.latitude_sede,
                 'lng': p.longitude_sede,
                 'nome': p.nome
             }
+            if p.contorno_geojson:
+                propriedades_geojson[str(p.id)] = p.contorno_geojson
+                
         context['propriedades_map_json'] = json.dumps(propriedades_map)
+        context['propriedades_json'] = json.dumps(propriedades_geojson)
 
         existentes = Talhao.objects.filter(propriedade__usuario=self.request.user, ativo=True).exclude(pk=self.object.pk).exclude(coordenadas_json__isnull=True)
         data = [{'nome': t.nome, 'propriedade_id': t.propriedade_id, 'geojson': t.coordenadas_json} for t in existentes]

@@ -86,7 +86,7 @@ class Plantio(models.Model):
     cultura = models.CharField(max_length=100, blank=True, null=True, default="Preparo de Solo")
     variedade = models.CharField(max_length=100, blank=True, null=True)
     data_plantio = models.DateField(blank=True, null=True)
-    ciclo_dias_estimado = models.PositiveIntegerField('Ciclo (dias)', blank=True, null=True, default=0)
+    ciclo_dias_estimado = models.PositiveIntegerField('Ciclo (dias)', blank=True, null=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PREPARO')
 
     def data_prevista_colheita(self):

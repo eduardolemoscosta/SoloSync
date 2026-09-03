@@ -106,6 +106,13 @@
             drawPolygon: true,
         });
 
+        // Habilitar Snapping (Atração Magnética) na Borda
+        map.pm.setGlobalOptions({
+            snappable: true,
+            snapDistance: 20, // Distância em pixels para o cursor ser atraído
+            snapMiddle: true
+        });
+
         var inputCoordenadas = document.getElementById('id_coordenadas_json') || document.getElementById('id_coordenadas');
         var inputArea = document.getElementById('id_area_m2');
         var selectPropriedade = document.getElementById('id_propriedade');
@@ -125,6 +132,14 @@
             console.error("Erro ao fazer parse das propriedades:", e);
         }
 
+        var limitesPropriedades = {};
+        try {
+            var rawLimites = '{{ propriedades_json|default:"{}"|escapejs }}';
+            if (rawLimites) limitesPropriedades = JSON.parse(rawLimites);
+        } catch (e) {
+            console.error("Erro ao fazer parse dos limites:", e);
+        }
+
         var talhoesExistentes = [];
         try {
             var rawJson = '{{ talhoes_existentes_json|default:"[]"|escapejs }}';
@@ -133,9 +148,31 @@
             console.error("Erro ao fazer parse dos talhões existentes:", e);
         }
 
+        let propriedadeLayer;
+
         function renderExistentes(selectedPropId) {
             existentesGroup.clearLayers();
             geojsonExistentesArray = [];
+
+            if (propriedadeLayer) {
+                map.removeLayer(propriedadeLayer);
+                propriedadeLayer = null;
+            }
+
+            if (selectedPropId && limitesPropriedades[selectedPropId]) {
+                var boundaryGeojson = limitesPropriedades[selectedPropId];
+                if (typeof boundaryGeojson === 'string') {
+                    try { boundaryGeojson = JSON.parse(boundaryGeojson); } catch(e){}
+                }
+                propriedadeLayer = L.geoJSON(boundaryGeojson, {
+                    style: { color: 'red', weight: 3, dashArray: '5, 5', fillColor: 'transparent', interactive: false },
+                    coordsToLatLng: function(coords) {
+                        if (coords[0] > -30 && coords[1] < -30) return new L.LatLng(coords[0], coords[1]);
+                        return new L.LatLng(coords[1], coords[0]);
+                    }
+                });
+                propriedadeLayer.addTo(map);
+            }
 
             if (talhoesExistentes && talhoesExistentes.length > 0) {
                 talhoesExistentes.forEach(function(t) {
@@ -178,7 +215,9 @@
                 var propId = this.value;
                 renderExistentes(propId);
 
-                if (propriedadesMap[propId]) {
+                if (propriedadeLayer) {
+                    map.fitBounds(propriedadeLayer.getBounds(), {padding: [20, 20]});
+                } else if (propriedadesMap[propId]) {
                     var p = propriedadesMap[propId];
                     if (drawnItems.getLayers().length === 0) {
                         if (existentesGroup.getLayers().length > 0) {
@@ -209,6 +248,8 @@
             } catch (e) {
                 console.error("Erro ao carregar coordenadas", e);
             }
+        } else if (propriedadeLayer) {
+            map.fitBounds(propriedadeLayer.getBounds(), {padding: [20, 20]});
         } else if (existentesGroup.getLayers().length > 0) {
             map.fitBounds(existentesGroup.getBounds(), {padding: [30, 30], maxZoom: 16});
         }
@@ -228,17 +269,46 @@
             return hasOverlap;
         }
 
-        function updateInputs() {
+        function isWithinProperty(newGeojson) {
+            var propId = selectPropriedade ? selectPropriedade.value : null;
+            if (propId && limitesPropriedades[propId]) {
+                var boundaryGeojson = limitesPropriedades[propId];
+                if (typeof boundaryGeojson === 'string') {
+                    try { boundaryGeojson = JSON.parse(boundaryGeojson); } catch(e){}
+                }
+                try {
+                    // Cria uma margem de tolerância (buffer) de 2 metros (0.002 km) para evitar bloqueios 
+                    // por erros milimétricos (float precision) devido ao snapping
+                    var toleranteBoundary = turf.buffer(boundaryGeojson, 0.002, {units: 'kilometers'});
+                    return turf.booleanWithin(newGeojson, toleranteBoundary);
+                } catch(err) {
+                    console.error("Erro no turf.booleanWithin", err);
+                    return true;
+                }
+            }
+            return true;
+        }
+
+        function updateInputs(layer) {
             var layers = drawnItems.getLayers();
             if (layers.length > 0) {
-                var layer = layers[0];
-                var geojson = layer.toGeoJSON();
+                var currentLayer = layer || layers[0];
+                var geojson = currentLayer.toGeoJSON();
                 
+                if (!isWithinProperty(geojson)) {
+                    alert("Erro: O talhão deve ser desenhado estritamente dentro dos limites da propriedade selecionada.");
+                    if (inputCoordenadas) inputCoordenadas.value = '';
+                    if (inputArea) inputArea.value = '';
+                    currentLayer.remove();
+                    drawnItems.removeLayer(currentLayer);
+                    return;
+                }
+
                 if (checkOverlap(geojson)) {
                     alert("Atenção: O polígono desenhado sobrepõe um talhão já existente nesta propriedade! Por favor, ajuste os limites.");
-                    layer.setStyle({color: 'red', fillColor: 'red'});
+                    currentLayer.setStyle({color: 'red', fillColor: 'red'});
                 } else {
-                    layer.setStyle({color: '#00ff00', fillColor: '#00ff00'});
+                    currentLayer.setStyle({color: '#00ff00', fillColor: '#00ff00'});
                 }
 
                 if (inputCoordenadas) inputCoordenadas.value = JSON.stringify(geojson);
@@ -252,12 +322,21 @@
         }
 
         map.on('pm:create', function(e) {
+            var geojson = e.layer.toGeoJSON();
+            if (!isWithinProperty(geojson)) {
+                alert("Erro: O talhão deve ser desenhado estritamente dentro dos limites da propriedade selecionada.");
+                e.layer.remove();
+                if (inputCoordenadas) inputCoordenadas.value = '';
+                if (inputArea) inputArea.value = '';
+                return;
+            }
+
             drawnItems.clearLayers();
             e.layer.setStyle({color: '#00ff00', weight: 3});
             drawnItems.addLayer(e.layer);
-            updateInputs();
+            updateInputs(e.layer);
 
-            e.layer.on('pm:edit', updateInputs);
+            e.layer.on('pm:edit', function() { updateInputs(e.layer); });
         });
 
         map.on('pm:remove', function(e) {
@@ -265,7 +344,7 @@
             updateInputs();
         });
 
-        drawnItems.on('pm:edit', updateInputs);
+        drawnItems.on('pm:edit', function(e) { updateInputs(e.layer); });
     });
 </script>
 {% endblock %}
