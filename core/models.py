@@ -33,6 +33,7 @@ class Propriedade(models.Model):
     latitude_sede = models.FloatField(help_text="Coordenada para centralizar o mapa da terra")
     longitude_sede = models.FloatField(help_text="Coordenada para centralizar o mapa da terra")
     area_total_ha = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    contorno_geojson = models.JSONField(blank=True, null=True, help_text="Coordenadas do perímetro da propriedade")
     criado_em = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -49,7 +50,7 @@ class Talhao(models.Model):
     ]
 
     # O talhão agora pertence a uma Propriedade/Terra específica
-    propriedade = models.ForeignKey(Propriedade, on_delete=models.CASCADE, related_name='talhoes')
+    propriedade = models.ForeignKey(Propriedade, on_delete=models.CASCADE, related_name='talhoes', null=True, blank=True)
     nome = models.CharField(max_length=100) # Ex: "Talhão 01", "T1"
     area_m2 = models.FloatField()
     tipo_solo = models.CharField(max_length=100, choices=TIPO_SOLO_CHOICES, default='Misto', blank=True, null=True)

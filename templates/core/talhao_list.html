@@ -23,7 +23,7 @@
         <button type="button" class="btn btn-warning btn-sm me-1" id="btn-unir" data-bs-toggle="modal" data-bs-target="#modalUnir" disabled>
             <i class="bi bi-intersect"></i> Unir
         </button>
-        <a href="{% url 'talhao_create' %}" class="btn btn-success btn-sm"><i class="bi bi-plus-lg"></i> Novo Talhão</a>
+        <a href="{% url 'talhao_create' %}{% if selected_propriedade %}?propriedade={{ selected_propriedade }}{% endif %}" class="btn btn-success btn-sm"><i class="bi bi-plus-lg"></i> Novo Talhão</a>
     </div>
 </div>
 
@@ -222,7 +222,11 @@
             
             if (allItems.getLayers().length > 0) {
                 map.addLayer(allItems);
+                {% if selected_propriedade %}
+                map.setView([defaultLat, defaultLng], 14);
+                {% else %}
                 map.fitBounds(allItems.getBounds(), {padding: [20, 20]});
+                {% endif %}
             }
         }
         

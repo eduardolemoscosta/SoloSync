@@ -154,6 +154,20 @@ class TalhaoListView(LoginRequiredMixin, ListView):
     context_object_name = 'talhoes'
 
     def get_queryset(self):
+        # Rotina para alocar talhões órfãos
+        orfaos = Talhao.objects.filter(propriedade__isnull=True)
+        if orfaos.exists():
+            prop_padrao, _ = Propriedade.objects.get_or_create(
+                usuario=self.request.user,
+                nome="Propriedade Padrão (Recuperada)",
+                defaults={
+                    'latitude_sede': -5.8958,
+                    'longitude_sede': -35.7633,
+                    'area_total_ha': 0
+                }
+            )
+            orfaos.update(propriedade=prop_padrao)
+
         qs = Talhao.objects.filter(propriedade__usuario=self.request.user, ativo=True).select_related('propriedade')
         propriedade_id = self.request.GET.get('propriedade')
         if propriedade_id:
@@ -199,7 +213,23 @@ class TalhaoCreateView(LoginRequiredMixin, CreateView):
         kwargs['user'] = self.request.user
         return kwargs
 
+    def get_initial(self):
+        initial = super().get_initial()
+        propriedade_id = self.request.GET.get('propriedade')
+        if propriedade_id:
+            initial['propriedade'] = propriedade_id
+        return initial
+
     def form_valid(self, form):
+        # Captura o ID da propriedade que está selecionada na tela
+        prop_id = self.request.POST.get('propriedade')
+        if prop_id:
+            form.instance.propriedade_id = prop_id
+
+        if not form.instance.propriedade:
+            messages.error(self.request, 'Selecione uma propriedade.')
+            return self.form_invalid(form)
+
         # Valida que a propriedade pertence ao usuário
         if form.instance.propriedade.usuario != self.request.user:
             messages.error(self.request, 'Propriedade inválida.')

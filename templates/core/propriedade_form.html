@@ -75,34 +75,9 @@
                                 {% endfor %}
                             </div>
 
-                            <div class="card bg-light border-0 p-3 mb-3">
-                                <h6 class="fw-bold text-secondary mb-2">
-                                    <i class="bi bi-compass-fill text-primary me-1"></i> Coordenadas da Sede / Centro
-                                </h6>
-                                <p class="text-muted small mb-2">
-                                    Clique no mapa, arraste o marcador ou use o GPS para definir o ponto central da propriedade.
-                                </p>
-
-                                <div class="mb-2">
-                                    <label for="id_latitude_sede" class="form-label small fw-semibold text-muted">Latitude:</label>
-                                    {{ form.latitude_sede }}
-                                    {% for error in form.latitude_sede.errors %}
-                                        <div class="text-danger small">{{ error }}</div>
-                                    {% endfor %}
-                                </div>
-
-                                <div class="mb-3">
-                                    <label for="id_longitude_sede" class="form-label small fw-semibold text-muted">Longitude:</label>
-                                    {{ form.longitude_sede }}
-                                    {% for error in form.longitude_sede.errors %}
-                                        <div class="text-danger small">{{ error }}</div>
-                                    {% endfor %}
-                                </div>
-
-                                <button type="button" class="btn btn-outline-primary btn-sm w-100" id="btn-gps">
-                                    <i class="bi bi-crosshair me-1"></i> Usar Minha Localização Atual (GPS)
-                                </button>
-                            </div>
+                            {{ form.contorno_geojson }}
+                            {{ form.latitude_sede }}
+                            {{ form.longitude_sede }}
 
                             <div class="d-flex justify-content-between mt-4">
                                 <a href="{% url 'propriedade_list' %}" class="btn btn-outline-secondary">Cancelar</a>
@@ -116,14 +91,14 @@
                         <div class="col-md-7">
                             <div class="d-flex justify-content-between align-items-center mb-2">
                                 <label class="form-label fw-bold mb-0">
-                                    <i class="bi bi-map-fill text-success me-1"></i> Posicione a Sede no Mapa
+                                    <i class="bi bi-map-fill text-success me-1"></i> Desenhe o Perímetro da Propriedade
                                 </label>
-                                <small class="badge bg-secondary">Clique ou arraste o pino</small>
+                                <small class="badge bg-secondary">Use o polígono</small>
                             </div>
                             <div id="mapPropriedadePicker"></div>
                             <small class="text-muted d-block mt-2">
                                 <i class="bi bi-info-circle me-1"></i> 
-                                Todos os talhões desta propriedade usarão este ponto de referência no mapa.
+                                Todos os talhões desta propriedade usarão o centro deste contorno como ponto de referência.
                             </small>
                         </div>
                     </div>
@@ -133,95 +108,115 @@
     </div>
 </div>
 
-<!-- Scripts Leaflet -->
+<!-- Scripts Leaflet, Geoman e Turf -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.css" />
+<script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.js"></script>
+<script src="https://unpkg.com/@turf/turf/turf.min.js"></script>
 <script>
     document.addEventListener("DOMContentLoaded", function() {
         var inputLat = document.getElementById('id_latitude_sede');
         var inputLng = document.getElementById('id_longitude_sede');
-        var btnGps = document.getElementById('btn-gps');
+        var inputGeojson = document.getElementById('id_contorno_geojson');
+        var inputArea = document.getElementById('id_area_total_ha');
 
         var initialLat = parseFloat(inputLat.value) || -5.8958;
         var initialLng = parseFloat(inputLng.value) || -35.7633;
 
         var map = L.map('mapPropriedadePicker').setView([initialLat, initialLng], 14);
 
-        // Satélite Híbrido Google Maps
         L.tileLayer('https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
             maxZoom: 20,
             subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
             attribution: '&copy; Google Maps'
         }).addTo(map);
 
-        var marker = L.marker([initialLat, initialLng], {
-            draggable: true,
-            title: "Sede da Propriedade"
-        }).addTo(map);
-
-        marker.bindPopup("<b>Sede da Propriedade</b><br>Arraste para ajustar a posição.").openPopup();
-
-        function updateInputs(lat, lng) {
-            inputLat.value = lat.toFixed(6);
-            inputLng.value = lng.toFixed(6);
-        }
-
-        // Se inputs estiverem vazios inicialmente, preencher com o padrão
-        if (!inputLat.value || !inputLng.value) {
-            updateInputs(initialLat, initialLng);
-        }
-
-        marker.on('dragend', function(e) {
-            var position = marker.getLatLng();
-            updateInputs(position.lat, position.lng);
+        map.pm.addControls({
+            position: 'topleft',
+            drawMarker: false,
+            drawCircleMarker: false,
+            drawPolyline: false,
+            drawRectangle: false,
+            drawCircle: false,
+            drawText: false,
+            editMode: true,
+            dragMode: false,
+            cutPolygon: false,
+            removalMode: true,
+            drawPolygon: true,
         });
 
-        map.on('click', function(e) {
-            marker.setLatLng(e.latlng);
-            updateInputs(e.latlng.lat, e.latlng.lng);
-            map.panTo(e.latlng);
-        });
+        var drawnItems = new L.FeatureGroup();
+        map.addLayer(drawnItems);
 
-        function onManualInputChange() {
-            var lat = parseFloat(inputLat.value);
-            var lng = parseFloat(inputLng.value);
-            if (!isNaN(lat) && !isNaN(lng)) {
-                var newLatLng = new L.LatLng(lat, lng);
-                marker.setLatLng(newLatLng);
-                map.panTo(newLatLng);
+        // Se já tiver contorno salvo, carregar
+        if (inputGeojson && inputGeojson.value) {
+            try {
+                var geojsonData = JSON.parse(inputGeojson.value);
+                var layer = L.geoJSON(geojsonData, {
+                    style: { color: '#0d6efd', weight: 3 },
+                    coordsToLatLng: function(coords) {
+                        if (coords[0] > -30 && coords[1] < -30) return new L.LatLng(coords[0], coords[1]);
+                        return new L.LatLng(coords[1], coords[0]);
+                    }
+                });
+                layer.eachLayer(function(l) {
+                    drawnItems.addLayer(l);
+                });
+                map.fitBounds(drawnItems.getBounds(), {padding: [30, 30]});
+            } catch (e) {
+                console.error("Erro ao carregar contorno existente", e);
             }
+        } else if ("geolocation" in navigator) {
+            // Se for novo e tiver GPS, tentar localizar para facilitar o início
+            navigator.geolocation.getCurrentPosition(function(position) {
+                map.setView([position.coords.latitude, position.coords.longitude], 15);
+            });
         }
-        inputLat.addEventListener('input', onManualInputChange);
-        inputLng.addEventListener('input', onManualInputChange);
 
-        // Botão de GPS
-        btnGps.addEventListener('click', function() {
-            if ("geolocation" in navigator) {
-                btnGps.disabled = true;
-                btnGps.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Obtendo localização GPS...';
+        function updateInputs() {
+            var layers = drawnItems.getLayers();
+            if (layers.length > 0) {
+                // Pega o primeiro polígono (limitamos a 1)
+                var layer = layers[0];
+                var geojson = layer.toGeoJSON();
                 
-                navigator.geolocation.getCurrentPosition(
-                    function(position) {
-                        var lat = position.coords.latitude;
-                        var lng = position.coords.longitude;
-                        updateInputs(lat, lng);
-                        var newLatLng = new L.LatLng(lat, lng);
-                        marker.setLatLng(newLatLng);
-                        map.setView(newLatLng, 16);
-                        marker.bindPopup("<b>Localização GPS Encontrada!</b>").openPopup();
-                        btnGps.disabled = false;
-                        btnGps.innerHTML = '<i class="bi bi-crosshair me-1"></i> Usar Minha Localização Atual (GPS)';
-                    },
-                    function(error) {
-                        alert("Não foi possível obter sua localização GPS automaticamente. Por favor, selecione no mapa.");
-                        btnGps.disabled = false;
-                        btnGps.innerHTML = '<i class="bi bi-crosshair me-1"></i> Usar Minha Localização Atual (GPS)';
-                    },
-                    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-                );
+                inputGeojson.value = JSON.stringify(geojson);
+
+                // Calcular o centro para latitude/longitude
+                var center = turf.centerOfMass(geojson);
+                var coords = center.geometry.coordinates;
+                // Turf retorna [lng, lat]
+                inputLat.value = coords[1].toFixed(6);
+                inputLng.value = coords[0].toFixed(6);
+
+                // Calcular área em hectares
+                var areaSqMeters = turf.area(geojson);
+                var areaHa = areaSqMeters / 10000;
+                inputArea.value = areaHa.toFixed(2);
             } else {
-                alert("Geolocalização não é suportada pelo seu navegador.");
+                inputGeojson.value = '';
+                inputLat.value = '';
+                inputLng.value = '';
+                // Não limpamos a área se o usuário digitou, mas se ele desenhar, atualiza
             }
+        }
+
+        map.on('pm:create', function(e) {
+            drawnItems.clearLayers(); // Permite apenas 1 contorno
+            e.layer.setStyle({color: '#0d6efd', weight: 3});
+            drawnItems.addLayer(e.layer);
+            updateInputs();
+
+            e.layer.on('pm:edit', updateInputs);
         });
+
+        map.on('pm:remove', function(e) {
+            drawnItems.removeLayer(e.layer);
+            updateInputs();
+        });
+
+        drawnItems.on('pm:edit', updateInputs);
     });
 </script>
 {% endblock %}

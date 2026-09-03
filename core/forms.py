@@ -4,14 +4,15 @@ from .models import Propriedade, Talhao, Plantio, Manejo, Irrigacao, Ocorrencia,
 class PropriedadeForm(forms.ModelForm):
     class Meta:
         model = Propriedade
-        fields = ['nome', 'cidade', 'estado', 'latitude_sede', 'longitude_sede', 'area_total_ha']
+        fields = ['nome', 'cidade', 'estado', 'latitude_sede', 'longitude_sede', 'area_total_ha', 'contorno_geojson']
         widgets = {
             'nome': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Fazenda Santa Luzia'}),
             'cidade': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Petrolina'}),
             'estado': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: PE', 'maxlength': '2'}),
-            'latitude_sede': forms.NumberInput(attrs={'class': 'form-control', 'step': 'any', 'id': 'id_latitude_sede'}),
-            'longitude_sede': forms.NumberInput(attrs={'class': 'form-control', 'step': 'any', 'id': 'id_longitude_sede'}),
+            'latitude_sede': forms.HiddenInput(attrs={'id': 'id_latitude_sede'}),
+            'longitude_sede': forms.HiddenInput(attrs={'id': 'id_longitude_sede'}),
             'area_total_ha': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'placeholder': 'Ex: 120.50'}),
+            'contorno_geojson': forms.HiddenInput(attrs={'id': 'id_contorno_geojson'}),
         }
 
 
