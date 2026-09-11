@@ -2,13 +2,13 @@
 
 {% block title %}{{ title }} - Gestão Agrícola{% endblock %}
 
-{% block content %}
+{% block extra_css %}
 <!-- Leaflet CSS -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.css" />
+{% endblock %}
 
-
-
-<div class="row justify-content-center mt-3">
+{% block content %}<div class="row justify-content-center mt-3">
     <div class="col-lg-11 col-xl-10">
         <div class="card shadow-sm border-0">
             <div class="card-header bg-success text-white py-3">
@@ -87,7 +87,7 @@
                                 </label>
                                 <small class="badge bg-secondary">Use o polígono</small>
                             </div>
-                            <div id="mapPropriedadePicker"></div>
+                            <div id="mapPropriedadePicker" style="height: 450px; width: 100%; border-radius: 8px; border: 1px solid #ced4da;"></div>
                             <small class="text-muted d-block mt-2">
                                 <i class="bi bi-info-circle me-1"></i> 
                                 Todos os talhões desta propriedade usarão o centro deste contorno como ponto de referência.
@@ -99,10 +99,11 @@
         </div>
     </div>
 </div>
+{% endblock %}
 
+{% block extra_js %}
 <!-- Scripts Leaflet, Geoman e Turf -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.css" />
 <script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.js"></script>
 <script src="https://unpkg.com/@turf/turf/turf.min.js"></script>
 <script>

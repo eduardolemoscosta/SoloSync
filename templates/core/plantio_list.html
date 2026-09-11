@@ -115,7 +115,11 @@
     document.addEventListener("DOMContentLoaded", function() {
         var defaultLat = {{ default_lat|stringformat:'f'|default:"-5.8958" }};
         var defaultLng = {{ default_lng|stringformat:'f'|default:"-35.7633" }};
-        var map = L.map('mapPlantios').setView([defaultLat, defaultLng], 14);
+        var map = L.map('mapPlantios', {
+            zoomAnimation: false,
+            fadeAnimation: false,
+            markerZoomAnimation: false
+        }).setView([defaultLat, defaultLng], 14);
         
         L.tileLayer('https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
             maxZoom: 20,
@@ -185,7 +189,7 @@
             
             if (allItems.getLayers().length > 0) {
                 map.addLayer(allItems);
-                map.fitBounds(allItems.getBounds(), {padding: [20, 20]});
+                map.fitBounds(allItems.getBounds(), {padding: [20, 20], animate: false});
             }
         }
     });

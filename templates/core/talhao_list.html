@@ -175,7 +175,11 @@
     document.addEventListener("DOMContentLoaded", function() {
         var defaultLat = {{ centro_mapa_lat|stringformat:'f'|default:"-5.8958" }};
         var defaultLng = {{ centro_mapa_lng|stringformat:'f'|default:"-35.7633" }};
-        var map = L.map('mapAll').setView([defaultLat, defaultLng], 14);
+        var map = L.map('mapAll', {
+            zoomAnimation: false,
+            fadeAnimation: false,
+            markerZoomAnimation: false
+        }).setView([defaultLat, defaultLng], 14);
         
         L.tileLayer('https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
             maxZoom: 20,
@@ -223,7 +227,7 @@
                 {% if selected_propriedade %}
                 map.setView([defaultLat, defaultLng], 14);
                 {% else %}
-                map.fitBounds(allItems.getBounds(), {padding: [20, 20]});
+                map.fitBounds(allItems.getBounds(), {padding: [20, 20], animate: false});
                 {% endif %}
             }
         }
@@ -309,7 +313,7 @@
                 cursorMarker: true 
             });
             
-            map.fitBounds(targetLayerToCut.getBounds(), {padding: [50, 50]});
+            map.fitBounds(targetLayerToCut.getBounds(), {padding: [50, 50], animate: false});
             
             var toast = document.createElement('div');
             toast.id = "corte-toast";
