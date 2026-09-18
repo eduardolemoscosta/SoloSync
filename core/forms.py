@@ -166,10 +166,11 @@ class OcorrenciaForm(forms.ModelForm):
 class RegistroIrrigacaoForm(forms.ModelForm):
     class Meta:
         model = RegistroIrrigacao
-        fields = ['plantio', 'data_irrigacao', 'duracao_horas', 'volume_mm', 'observacoes']
+        fields = ['plantio', 'data_irrigacao', 'hora_irrigacao', 'duracao_horas', 'volume_mm', 'observacoes']
         widgets = {
             'plantio': forms.Select(attrs={'class': 'form-select'}),
             'data_irrigacao': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'hora_irrigacao': forms.TimeInput(attrs={'type': 'time', 'class': 'form-control'}),
             'duracao_horas': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
             'volume_mm': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
             'observacoes': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),

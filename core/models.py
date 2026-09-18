@@ -182,6 +182,7 @@ class Ocorrencia(models.Model):
 class RegistroIrrigacao(models.Model):
     plantio = models.ForeignKey(Plantio, on_delete=models.CASCADE, related_name='registros_irrigacao')
     data_irrigacao = models.DateField(default=timezone.now)
+    hora_irrigacao = models.TimeField(default=timezone.now)
     duracao_horas = models.DecimalField(max_digits=5, decimal_places=2, blank=True, null=True, help_text="Tempo de rega em horas")
     volume_mm = models.DecimalField(max_digits=5, decimal_places=2, blank=True, null=True, help_text="Volume estimado em mm (L/m²)")
     observacoes = models.TextField(blank=True, null=True)
