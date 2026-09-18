@@ -30,7 +30,7 @@
                         ({{ plantio.porcentagem_progresso }}%)
                     </small>
                 </div>
-                <div class="progress" style="height: 15px;">
+                <div class="progress progress-md">
                     <div class="progress-bar {% if plantio.porcentagem_progresso >= 100 %}bg-success{% else %}bg-primary{% endif %}" role="progressbar" style="width: {{ plantio.porcentagem_progresso }}%;"></div>
                 </div>
             </div>
@@ -41,7 +41,7 @@
                 <h5 class="mb-0">Localização no Mapa</h5>
             </div>
             <div class="card-body p-2">
-                <div id="minimapa" style="height: 250px; border-radius: 8px;"></div>
+                <div id="minimapa"></div>
             </div>
         </div>
     </div>

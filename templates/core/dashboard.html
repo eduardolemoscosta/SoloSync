@@ -73,7 +73,7 @@
                         </small>
                         <small class="text-muted">{{ p.porcentagem_progresso }}%</small>
                     </div>
-                    <div class="progress" style="height: 15px;">
+                    <div class="progress progress-md">
                         <div class="progress-bar {% if p.porcentagem_progresso >= 100 %}bg-success{% else %}bg-primary{% endif %}" role="progressbar" style="width: {{ p.porcentagem_progresso }}%;" aria-valuenow="{{ p.porcentagem_progresso }}" aria-valuemin="0" aria-valuemax="100"></div>
                     </div>
                 </td>

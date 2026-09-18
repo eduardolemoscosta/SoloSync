@@ -23,7 +23,7 @@
 
         <!-- Dropdown Seletor de Talhão -->
         <div class="d-inline-block">
-            <select class="form-select form-select-sm" onchange="if(this.value) window.location.href=this.value;" style="min-width: 200px;">
+            <select class="form-select form-select-sm select-min-200" onchange="if(this.value) window.location.href=this.value;">
                 <option disabled>Alternar Talhão na {{ propriedade.nome }}...</option>
                 {% for t in todos_talhoes %}
                     <option value="{% url 'talhao_dashboard' t.id %}" {% if t.id == talhao.id %}selected{% endif %}>
@@ -121,7 +121,7 @@
                         <h4 class="fw-bold mb-0">Dia {{ plantio_ativo.dias_decorridos }} <small class="text-muted fs-6">/ {{ plantio_ativo.ciclo_dias_estimado }}d</small></h4>
                         <span class="fw-bold text-success">{{ plantio_ativo.porcentagem_progresso }}%</span>
                     </div>
-                    <div class="progress mb-2" style="height: 8px;">
+                    <div class="progress mb-2 progress-sm">
                         <div class="progress-bar {% if plantio_ativo.porcentagem_progresso >= 100 %}bg-success{% else %}bg-warning{% endif %}" 
                              role="progressbar" 
                              style="width: {{ plantio_ativo.porcentagem_progresso }}%;"></div>
@@ -212,7 +212,7 @@
                 </ul>
 
                 <h6 class="fw-bold text-muted small text-uppercase mb-1"><i class="bi bi-card-text me-1"></i> Observações & Notas</h6>
-                <div class="p-2 bg-light rounded border text-muted small" style="min-height: 80px;">
+                <div class="p-2 bg-light rounded border text-muted small min-h-80">
                     {{ talhao.observacoes|default:"Nenhuma observação geográfica registrada."|linebreaksbr }}
                 </div>
 
@@ -268,7 +268,7 @@
                     <table class="table table-hover align-middle">
                         <thead class="table-light">
                             <tr>
-                                <th style="width: 120px;">Data</th>
+                                <th class="col-w-120">Data</th>
                                 <th>Operação / Categoria</th>
                                 <th>Produto / Insumo</th>
                                 <th>Dosagem / Duração</th>
@@ -318,7 +318,7 @@
                     <table class="table table-hover align-middle">
                         <thead class="table-light">
                             <tr>
-                                <th style="width: 120px;">Data</th>
+                                <th class="col-w-120">Data</th>
                                 <th>Tipo de Ocorrência</th>
                                 <th>Cultura</th>
                                 <th>Diagnóstico / Descrição</th>

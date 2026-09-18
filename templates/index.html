@@ -10,107 +10,43 @@
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     {% block extra_css %}{% endblock %}
-    <style>
-        body, html {
-            height: 100%;
-            margin: 0;
-            background-color: #f8f9fa;
-        }
-        .map-container, #map, [id^="map"] {
-            min-height: 480px;
-            width: 100%;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            border: 1px solid #ced4da;
-            z-index: 1; /* Garantir que o mapa fique abaixo dos menus dropdown */
-        }
-        .wrapper {
-            min-height: 100vh;
-            display: flex;
-        }
-        .sidebar {
-            width: 260px;
-            background-color: #1e6f42; /* tom verde da barra */
-            color: #ffffff;
-            flex-shrink: 0;
-            padding-top: 1.5rem;
-        }
-        .sidebar h4 {
-            color: #ffffff;
-            font-weight: bold;
-        }
-        .sidebar a, .sidebar button {
-            color: #e8f5e9;
-            text-decoration: none;
-            display: block;
-            padding: 10px 16px;
-            border-radius: 4px;
-            margin: 4px 12px;
-            transition: all 0.2s ease-in-out;
-            font-size: 0.95rem;
-        }
-        .sidebar a:hover, .sidebar button:hover {
-            background-color: rgba(255, 255, 255, 0.15);
-            color: #ffffff;
-        }
-        .sidebar hr {
-            border-color: rgba(255, 255, 255, 0.2);
-            margin: 1rem 12px;
-        }
-        .main-content {
-            flex-grow: 1;
-            padding: 2rem;
-            width: calc(100% - 260px);
-        }
-        @media (max-width: 768px) {
-            .wrapper {
-                flex-direction: column;
-            }
-            .sidebar {
-                width: 100%;
-                min-height: auto;
-            }
-            .main-content {
-                width: 100%;
-                padding: 1rem;
-            }
-        }
-    </style>
+
 </head>
 <body>
     <div class="wrapper">
-        <aside class="sidebar">
-            <h4 class="text-center mb-4"><i class="bi bi-tree-fill"></i> SoloSync</h4>
+        <aside class="sidebar d-flex flex-column vh-100">
+            <div class="mb-auto">
+                <h4 class="text-center mb-4"><i class="bi bi-tree-fill"></i> SoloSync</h4>
+                
+                {% if user.is_authenticated %}
+                    <div class="text-center mb-4">
+                        <p class="small mb-0 text-light">Olá, <strong>{{ user.username }}</strong></p>
+                        <small class="propriedades-count"><i class="bi bi-houses"></i> {{ user.propriedades.count }} propriedade(s)</small>
+                    </div>
+                    
+                    <a href="{% url 'dashboard' %}"><i class="bi bi-speedometer2 me-2"></i> Dashboard</a>
+                    <a href="{% url 'propriedade_list' %}"><i class="bi bi-houses-fill me-2"></i> Minhas Propriedades</a>
+                    <a href="{% url 'talhao_list' %}"><i class="bi bi-geo-alt me-2"></i> Meus Talhões</a>
+                    <a href="{% url 'plantio_list' %}"><i class="bi bi-flower1 me-2"></i> Meus Plantios</a>
+                    
+                    <hr>
+                    
+                    <a href="{% url 'propriedade_create' %}"><i class="bi bi-plus-circle me-2"></i> Nova Propriedade</a>
+                    <a href="{% url 'talhao_create' %}"><i class="bi bi-plus-square me-2"></i> Novo Talhão</a>
+                    <a href="{% url 'manejo_create' %}"><i class="bi bi-tools me-2"></i> Novo Manejo</a>
+                    <a href="{% url 'irrigacao_create' %}"><i class="bi bi-droplet me-2"></i> Nova Irrigação</a>
+                {% else %}
+                    <a href="{% url 'login' %}"><i class="bi bi-box-arrow-in-right me-2"></i> Entrar</a>
+                    <a href="{% url 'signup' %}"><i class="bi bi-person-plus me-2"></i> Cadastrar</a>
+                {% endif %}
+            </div>
             
             {% if user.is_authenticated %}
-                <div class="text-center mb-4">
-                    <p class="small mb-0 text-light">Olá, <strong>{{ user.username }}</strong></p>
-                    <small style="color: #c8e6c9;"><i class="bi bi-houses"></i> {{ user.propriedades.count }} propriedade(s)</small>
-                </div>
-                
-                <a href="{% url 'dashboard' %}"><i class="bi bi-speedometer2 me-2"></i> Dashboard</a>
-                <a href="{% url 'propriedade_list' %}"><i class="bi bi-houses-fill me-2"></i> Minhas Propriedades</a>
-                <a href="{% url 'talhao_list' %}"><i class="bi bi-geo-alt me-2"></i> Meus Talhões</a>
-                <a href="{% url 'plantio_list' %}"><i class="bi bi-flower1 me-2"></i> Meus Plantios</a>
-                
-                <hr>
-                
-                <a href="{% url 'propriedade_create' %}"><i class="bi bi-plus-circle me-2"></i> Nova Propriedade</a>
-                <a href="{% url 'talhao_create' %}"><i class="bi bi-plus-square me-2"></i> Novo Talhão</a>
-                <a href="{% url 'manejo_create' %}"><i class="bi bi-tools me-2"></i> Novo Manejo</a>
-                <a href="{% url 'irrigacao_create' %}"><i class="bi bi-droplet me-2"></i> Nova Irrigação</a>
-                
-                <hr>
-                
-                <form method="post" action="{% url 'logout' %}" class="m-0 p-0">
-                    {% csrf_token %}
-                    <button type="submit" class="btn btn-link text-start w-100 border-0 shadow-none">
-                        <i class="bi bi-box-arrow-right me-2"></i> Sair
-                    </button>
-                </form>
-            {% else %}
-                <a href="{% url 'login' %}"><i class="bi bi-box-arrow-in-right me-2"></i> Entrar</a>
-                <a href="{% url 'signup' %}"><i class="bi bi-person-plus me-2"></i> Cadastrar</a>
+            <div class="mt-auto p-3 border-top border-success border-opacity-25">
+                <a href="{% url 'logout' %}" class="btn btn-danger w-100 d-flex align-items-center justify-content-center gap-2">
+                    <i class="bi bi-box-arrow-right"></i> Sair
+                </a>
+            </div>
             {% endif %}
         </aside>
 

@@ -1,0 +1,87 @@
+body, html {
+    height: 100%;
+    margin: 0;
+    background-color: #f8f9fa;
+}
+.map-container, #map, [id^="map"] {
+    min-height: 480px;
+    width: 100%;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    border: 1px solid #ced4da;
+    z-index: 1; /* Garantir que o mapa fique abaixo dos menus dropdown */
+}
+.wrapper {
+    min-height: 100vh;
+    display: flex;
+}
+.sidebar {
+    width: 260px;
+    background-color: #1e6f42; /* tom verde da barra */
+    color: #ffffff;
+    flex-shrink: 0;
+    padding-top: 1.5rem;
+}
+.sidebar h4 {
+    color: #ffffff;
+    font-weight: bold;
+}
+.sidebar a, .sidebar button {
+    color: #e8f5e9;
+    text-decoration: none;
+    display: block;
+    padding: 10px 16px;
+    border-radius: 4px;
+    margin: 4px 12px;
+    transition: all 0.2s ease-in-out;
+    font-size: 0.95rem;
+}
+.sidebar a:hover, .sidebar button:hover {
+    background-color: rgba(255, 255, 255, 0.15);
+    color: #ffffff;
+}
+.sidebar hr {
+    border-color: rgba(255, 255, 255, 0.2);
+    margin: 1rem 12px;
+}
+.main-content {
+    flex-grow: 1;
+    padding: 2rem;
+    width: calc(100% - 260px);
+}
+@media (max-width: 768px) {
+    .wrapper {
+        flex-direction: column;
+    }
+    .sidebar {
+        width: 100%;
+        min-height: auto;
+    }
+    .main-content {
+        width: 100%;
+        padding: 1rem;
+    }
+}
+/* Utilitários - Progresso */
+.progress-md { height: 15px; }
+.progress-sm { height: 8px; }
+
+/* Utilitários - Mapas */
+#minimapa {
+    height: 250px;
+    border-radius: 8px;
+}
+#mapPropriedadePicker {
+    height: 450px;
+    width: 100%;
+    border-radius: 8px;
+    border: 1px solid #ced4da;
+}
+
+/* Utilitários - Elementos */
+.select-min-200 { min-width: 200px; }
+.select-min-180 { min-width: 180px; }
+.min-h-80 { min-height: 80px; }
+.col-w-120 { width: 120px; }
+.col-w-40 { width: 40px; }
+.propriedades-count { color: #c8e6c9; }

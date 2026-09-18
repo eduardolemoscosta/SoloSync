@@ -42,7 +42,7 @@
                     </small>
                     <small class="text-muted">{{ plantio.porcentagem_progresso }}%</small>
                 </div>
-                <div class="progress mb-3" style="height: 15px;">
+                <div class="progress mb-3 progress-md">
                     <div class="progress-bar {% if plantio.porcentagem_progresso >= 100 %}bg-success{% else %}bg-primary{% endif %}" role="progressbar" style="width: {{ plantio.porcentagem_progresso }}%;"></div>
                 </div>
             </div>
