@@ -8,8 +8,8 @@ from django.dispatch import receiver
 class PerfilUsuario(models.Model):
     usuario = models.OneToOneField(User, on_delete=models.CASCADE, related_name='perfil')
     nome_propriedade = models.CharField('Nome da Propriedade', max_length=150, blank=True, null=True)
-    latitude_propriedade = models.FloatField('Latitude', default=-5.8958)  # Coordenada padrão de fallback
-    longitude_propriedade = models.FloatField('Longitude', default=-35.7633) # Coordenada padrão de fallback
+    latitude_propriedade = models.FloatField('Latitude', default=-5.8958)
+    longitude_propriedade = models.FloatField('Longitude', default=-35.7633)
     propriedade_configurada = models.BooleanField('Propriedade Configurada', default=False)
 
     def __str__(self):
@@ -20,14 +20,13 @@ def criar_perfil_usuario(sender, instance, created, **kwargs):
     if created:
         PerfilUsuario.objects.get_or_create(usuario=instance)
     else:
-        # Garante que mesmo usuários criados antes tenham perfil
         if not hasattr(instance, 'perfil'):
             PerfilUsuario.objects.get_or_create(usuario=instance)
 
 
 class Propriedade(models.Model):
     usuario = models.ForeignKey(User, on_delete=models.CASCADE, related_name='propriedades')
-    nome = models.CharField(max_length=150) # Ex: "Fazenda Santa Luzia"
+    nome = models.CharField(max_length=150)
     cidade = models.CharField(max_length=100, blank=True, null=True)
     estado = models.CharField(max_length=2, blank=True, null=True)
     latitude_sede = models.FloatField(help_text="Coordenada para centralizar o mapa da terra")
@@ -49,11 +48,19 @@ class Talhao(models.Model):
         ('Outro', 'Outro'),
     ]
 
-    # O talhão agora pertence a uma Propriedade/Terra específica
+    SISTEMA_IRRIGACAO_CHOICES = [
+        ('GOTEJAMENTO', 'Gotejamento'),
+        ('ASPERSAO', 'Aspersão'),
+        ('MICROASPERSAO', 'Microaspersão'),
+        ('PIVO', 'Pivô Central'),
+        ('SEQUEIRO', 'Sequeiro / Sem Irrigação'),
+    ]
+
     propriedade = models.ForeignKey(Propriedade, on_delete=models.CASCADE, related_name='talhoes', null=True, blank=True)
-    nome = models.CharField(max_length=100) # Ex: "Talhão 01", "T1"
+    nome = models.CharField(max_length=100)
     area_m2 = models.FloatField()
     tipo_solo = models.CharField(max_length=100, choices=TIPO_SOLO_CHOICES, default='Misto', blank=True, null=True)
+    sistema_irrigacao = models.CharField(max_length=20, choices=SISTEMA_IRRIGACAO_CHOICES, default='SEQUEIRO')
     coordenadas_json = models.JSONField(help_text="Polígono do talhão no mapa [[lat, lng], ...]", null=True, blank=True)
     observacoes = models.TextField(blank=True, null=True)
     ativo = models.BooleanField(default=True)
@@ -171,3 +178,13 @@ class Ocorrencia(models.Model):
 
     def __str__(self):
         return f"{self.tipo} - {self.plantio.cultura}"
+
+class RegistroIrrigacao(models.Model):
+    plantio = models.ForeignKey(Plantio, on_delete=models.CASCADE, related_name='registros_irrigacao')
+    data_irrigacao = models.DateField(default=timezone.now)
+    duracao_horas = models.DecimalField(max_digits=5, decimal_places=2, blank=True, null=True, help_text="Tempo de rega em horas")
+    volume_mm = models.DecimalField(max_digits=5, decimal_places=2, blank=True, null=True, help_text="Volume estimado em mm (L/m²)")
+    observacoes = models.TextField(blank=True, null=True)
+
+    def __str__(self):
+        return f"Registro de Irrigação: {self.data_irrigacao} - {self.plantio.cultura}"

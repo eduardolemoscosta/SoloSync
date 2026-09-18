@@ -60,14 +60,11 @@ class PropriedadeHierarchyTests(TestCase):
 
     def test_propriedade_crud_views(self):
         self.client.login(username='fazendeiro_joao', password='password123')
-        
-        # List
         res = self.client.get(reverse('propriedade_list'))
         self.assertEqual(res.status_code, 200)
         self.assertContains(res, 'Fazenda Santa Luzia')
         self.assertContains(res, 'Sítio Boa Vista')
 
-        # Create
         res = self.client.post(reverse('propriedade_create'), {
             'nome': 'Chácara Recanto Verde',
             'cidade': 'Casa Nova',
@@ -79,7 +76,6 @@ class PropriedadeHierarchyTests(TestCase):
         self.assertEqual(res.status_code, 302)
         self.assertTrue(Propriedade.objects.filter(nome='Chácara Recanto Verde', usuario=self.user).exists())
 
-        # Update
         chacara = Propriedade.objects.get(nome='Chácara Recanto Verde')
         res = self.client.post(reverse('propriedade_update', kwargs={'pk': chacara.pk}), {
             'nome': 'Chácara Recanto Verde Atualizada',
@@ -94,7 +90,6 @@ class PropriedadeHierarchyTests(TestCase):
         self.assertEqual(chacara.nome, 'Chácara Recanto Verde Atualizada')
         self.assertEqual(chacara.area_total_ha, 15.0)
 
-        # Delete
         res = self.client.post(reverse('propriedade_delete', kwargs={'pk': chacara.pk}))
         self.assertEqual(res.status_code, 302)
         self.assertFalse(Propriedade.objects.filter(pk=chacara.pk).exists())

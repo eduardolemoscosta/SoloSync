@@ -9,8 +9,8 @@ from django.contrib import messages
 from django.db import transaction, models
 from decimal import Decimal
 import json
-from .models import Propriedade, Talhao, Plantio, Manejo, Irrigacao, Ocorrencia, PerfilUsuario
-from .forms import PropriedadeForm, TalhaoForm, PlantioForm, ManejoForm, IrrigacaoForm, OcorrenciaForm, PerfilUsuarioForm
+from .models import Propriedade, Talhao, Plantio, Manejo, Irrigacao, Ocorrencia, PerfilUsuario, RegistroIrrigacao
+from .forms import PropriedadeForm, TalhaoForm, PlantioForm, ManejoForm, IrrigacaoForm, OcorrenciaForm, PerfilUsuarioForm, RegistroIrrigacaoForm
 from django.contrib.auth import login
 
 
@@ -47,10 +47,6 @@ def configurar_propriedade(request):
         'is_onboarding': not perfil.propriedade_configurada
     })
 
-
-# ==========================================
-# CRUD de Propriedades / Terras (Fazendas)
-# ==========================================
 
 class PropriedadeListView(LoginRequiredMixin, ListView):
     model = Propriedade
@@ -129,10 +125,6 @@ class PropriedadeDeleteView(LoginRequiredMixin, DeleteView):
         return super().form_valid(form)
 
 
-# ==========================================
-# Dashboard & Talhões
-# ==========================================
-
 class DashboardView(LoginRequiredMixin, TemplateView):
     template_name = 'core/dashboard.html'
 
@@ -154,7 +146,6 @@ class TalhaoListView(LoginRequiredMixin, ListView):
     context_object_name = 'talhoes'
 
     def get_queryset(self):
-        # Rotina para alocar talhões órfãos
         orfaos = Talhao.objects.filter(propriedade__isnull=True)
         if orfaos.exists():
             prop_padrao, _ = Propriedade.objects.get_or_create(
@@ -190,7 +181,6 @@ class TalhaoListView(LoginRequiredMixin, ListView):
         context['propriedades'] = Propriedade.objects.filter(usuario=self.request.user).order_by('nome')
         context['selected_propriedade'] = self.request.GET.get('propriedade', '')
 
-        # Se houver propriedade selecionada, obter suas coordenadas centrais
         prop_selecionada = None
         if context['selected_propriedade']:
             prop_selecionada = context['propriedades'].filter(id=context['selected_propriedade']).first()
@@ -221,7 +211,6 @@ class TalhaoCreateView(LoginRequiredMixin, CreateView):
         return initial
 
     def form_valid(self, form):
-        # Captura o ID da propriedade que está selecionada na tela
         prop_id = self.request.POST.get('propriedade')
         if prop_id:
             form.instance.propriedade_id = prop_id
@@ -230,7 +219,6 @@ class TalhaoCreateView(LoginRequiredMixin, CreateView):
             messages.error(self.request, 'Selecione uma propriedade.')
             return self.form_invalid(form)
 
-        # Valida que a propriedade pertence ao usuário
         if form.instance.propriedade.usuario != self.request.user:
             messages.error(self.request, 'Propriedade inválida.')
             return self.form_invalid(form)
@@ -342,7 +330,6 @@ def unir_talhoes(request):
         messages.error(request, 'Talhões inválidos ou não pertencem a você.')
         return redirect('talhao_list')
 
-    # Valida se pertencem à mesma propriedade
     propriedades_ids = set(t.propriedade_id for t in talhoes)
     if len(propriedades_ids) > 1:
         messages.error(request, 'Só é possível unir talhões que pertencem à mesma propriedade.')
@@ -515,10 +502,6 @@ def registrar_colheita(request, pk):
 
     return redirect('plantio_list')
 
-
-# ==========================================
-# Plantios, Manejos, Irrigações e Ocorrências
-# ==========================================
 
 class PlantioListView(LoginRequiredMixin, ListView):
     model = Plantio
@@ -788,4 +771,17 @@ def talhao_dashboard(request, pk):
         'default_lng': talhao.propriedade.longitude_sede,
     }
     return render(request, 'core/talhao_dashboard.html', context)
+
+@login_required
+def nova_irrigacao(request):
+    if request.method == 'POST':
+        form = RegistroIrrigacaoForm(request.POST, user=request.user)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Irrigação registrada com sucesso!')
+            return redirect('dashboard')
+    else:
+        form = RegistroIrrigacaoForm(user=request.user)
+    
+    return render(request, 'core/irrigacao_form.html', {'form': form, 'title': 'Nova Irrigação'})
 

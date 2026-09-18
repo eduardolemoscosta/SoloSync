@@ -1,4 +1,4 @@
-# Gestão Agrícola 🌱
+# SoloSync 🌱
 
 Um sistema web desenvolvido em Django para o gerenciamento de propriedades rurais, controle de talhões, acompanhamento de safras (plantios) e registros de atividades rotineiras no campo.
 

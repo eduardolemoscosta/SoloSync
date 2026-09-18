@@ -1,5 +1,5 @@
 from django import forms
-from .models import Propriedade, Talhao, Plantio, Manejo, Irrigacao, Ocorrencia, PerfilUsuario
+from .models import Propriedade, Talhao, Plantio, Manejo, Irrigacao, Ocorrencia, PerfilUsuario, RegistroIrrigacao
 
 class PropriedadeForm(forms.ModelForm):
     class Meta:
@@ -30,12 +30,13 @@ class PerfilUsuarioForm(forms.ModelForm):
 class TalhaoForm(forms.ModelForm):
     class Meta:
         model = Talhao
-        fields = ['propriedade', 'nome', 'area_m2', 'tipo_solo', 'coordenadas_json', 'observacoes']
+        fields = ['propriedade', 'nome', 'area_m2', 'tipo_solo', 'sistema_irrigacao', 'coordenadas_json', 'observacoes']
         widgets = {
             'propriedade': forms.Select(attrs={'class': 'form-select', 'id': 'id_propriedade'}),
             'nome': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Talhão 01, T1'}),
             'area_m2': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'readonly': 'readonly'}),
             'tipo_solo': forms.Select(attrs={'class': 'form-select'}),
+            'sistema_irrigacao': forms.Select(attrs={'class': 'form-select'}),
             'coordenadas_json': forms.HiddenInput(attrs={'id': 'id_coordenadas_json'}),
             'observacoes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
         }
@@ -159,5 +160,23 @@ class OcorrenciaForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         user = kwargs.pop('user', None)
         super(OcorrenciaForm, self).__init__(*args, **kwargs)
+        if user:
+            self.fields['plantio'].queryset = Plantio.objects.filter(talhao__propriedade__usuario=user)
+
+class RegistroIrrigacaoForm(forms.ModelForm):
+    class Meta:
+        model = RegistroIrrigacao
+        fields = ['plantio', 'data_irrigacao', 'duracao_horas', 'volume_mm', 'observacoes']
+        widgets = {
+            'plantio': forms.Select(attrs={'class': 'form-select'}),
+            'data_irrigacao': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'duracao_horas': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'volume_mm': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'observacoes': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        user = kwargs.pop('user', None)
+        super(RegistroIrrigacaoForm, self).__init__(*args, **kwargs)
         if user:
             self.fields['plantio'].queryset = Plantio.objects.filter(talhao__propriedade__usuario=user)

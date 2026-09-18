@@ -1,0 +1,77 @@
+{% extends 'index.html' %}
+
+{% block title %}Nova Irrigação - SoloSync{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="bi bi-droplet"></i> {{ title }}</h5>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        {% if form.non_field_errors %}
+                            <div class="alert alert-danger">
+                                {% for error in form.non_field_errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+
+                        <div class="mb-3">
+                            <label for="{{ form.plantio.id_for_label }}" class="form-label">Plantio/Talhão</label>
+                            {{ form.plantio }}
+                            {% if form.plantio.errors %}
+                                <div class="text-danger small">{{ form.plantio.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <label for="{{ form.data_irrigacao.id_for_label }}" class="form-label">Data da Irrigação</label>
+                                {{ form.data_irrigacao }}
+                                {% if form.data_irrigacao.errors %}
+                                    <div class="text-danger small">{{ form.data_irrigacao.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-4">
+                                <label for="{{ form.duracao_horas.id_for_label }}" class="form-label">Duração (Horas)</label>
+                                {{ form.duracao_horas }}
+                                {% if form.duracao_horas.errors %}
+                                    <div class="text-danger small">{{ form.duracao_horas.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-4">
+                                <label for="{{ form.volume_mm.id_for_label }}" class="form-label">Volume (mm)</label>
+                                {{ form.volume_mm }}
+                                {% if form.volume_mm.errors %}
+                                    <div class="text-danger small">{{ form.volume_mm.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="{{ form.observacoes.id_for_label }}" class="form-label">Observações</label>
+                            {{ form.observacoes }}
+                            {% if form.observacoes.errors %}
+                                <div class="text-danger small">{{ form.observacoes.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="d-flex justify-content-end gap-2 mt-4">
+                            <a href="{% url 'dashboard' %}" class="btn btn-secondary">Cancelar</a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-save"></i> Salvar Registro
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
