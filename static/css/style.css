@@ -15,9 +15,13 @@ body, html {
     min-height: 100vh;
     display: flex;
 }
-.sidebar {
-    width: 260px;
-    background-color: #1e6f42; /* tom verde da barra */
+.sidebar {  /* barra lateral */
+    position: sticky;
+    top: 0;
+    height: 100vh; 
+    overflow-y: auto; 
+    width: 250px;
+    background-color: #1e6f42; 
     color: #ffffff;
     flex-shrink: 0;
     padding-top: 1.5rem;
