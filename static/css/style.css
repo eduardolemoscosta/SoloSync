@@ -89,3 +89,60 @@ body, html {
 .col-w-120 { width: 120px; }
 .col-w-40 { width: 40px; }
 .propriedades-count { color: #c8e6c9; }
+
+/* Variáveis do Django Admin */
+:root {
+    --primary: #1e6f42;
+    --primary-fg: #ffffff;
+    --secondary: #165633;
+    --accent: #279357;
+    --button-bg: #1e6f42;
+    --button-hover-bg: #165633;
+    --default-button-bg: #165633;
+    --default-button-hover-bg: #104025;
+    --header-bg: #1e6f42;
+    --header-color: #ffffff;
+    --header-link-color: #e8f5e9;
+    --breadcrumbs-bg: #1e6f42;
+    --breadcrumbs-fg: #e8f5e9;
+    --breadcrumbs-link-fg: #ffffff;
+    --selected-bg: #e8f5e9;
+    --selected-row: #e8f5e9;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --primary: #279357;
+        --primary-fg: #ffffff;
+        --secondary: #1e6f42;
+        --accent: #279357;
+        --button-bg: #1e6f42;
+        --button-hover-bg: #165633;
+        --default-button-bg: #165633;
+        --default-button-hover-bg: #104025;
+        --header-bg: #165633;
+        --header-color: #ffffff;
+        --header-link-color: #e8f5e9;
+        --breadcrumbs-bg: #1e6f42;
+        --breadcrumbs-fg: #e8f5e9;
+        --breadcrumbs-link-fg: #ffffff;
+    }
+}
+
+/* Ajustes adicionais para garantir que os links e botões tenham as cores corretas */
+#header a:hover {
+    color: #ffffff;
+}
+
+.module h2, .module caption, .inline-group h2 {
+    background: var(--primary);
+}
+
+div.breadcrumbs {
+    background: var(--breadcrumbs-bg);
+    color: var(--breadcrumbs-fg);
+}
+
+div.breadcrumbs a {
+    color: var(--breadcrumbs-link-fg);
+}
