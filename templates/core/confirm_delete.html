@@ -11,9 +11,9 @@
                 <p class="fs-5 mt-3">Você tem certeza que deseja excluir <strong>{{ object }}</strong>?</p>
                 <p class="text-muted">Esta ação não pode ser desfeita.</p>
                 
-                <form method="post" class="mt-4">
+                <form method="post" class="confirm-delete mt-4">
                     {% csrf_token %}
-                    <a href="javascript:history.back()" class="btn btn-outline-secondary me-2">Cancelar</a>
+                    <button type="button" class="btn btn-outline-secondary me-2" onclick="window.history.back()">Cancelar</button>
                     <button type="submit" class="btn btn-danger">Sim, excluir</button>
                 </form>
             </div>

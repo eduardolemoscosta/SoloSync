@@ -13,6 +13,14 @@
     </div>
 </div>
 
+<div class="card card-body mb-3">
+    <div class="input-group">
+        <span class="input-group-text"><i class="bi bi-search"></i></span>
+        <input type="search" class="form-control" placeholder="Pesquisar propriedade por nome ou cidade" data-list-search="#lista-propriedades" data-search-count="#contador-propriedades" aria-label="Pesquisar propriedades">
+        <span class="input-group-text" id="contador-propriedades"></span>
+    </div>
+</div>
+
 <!-- Leaflet CSS -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
@@ -29,9 +37,9 @@
 </div>
 {% endif %}
 
-<div class="row g-4">
+<div class="row g-4" id="lista-propriedades">
     {% for prop in propriedades %}
-    <div class="col-md-6 col-lg-4">
+    <div class="col-md-6 col-lg-4" data-searchable="{{ prop.nome }} {{ prop.cidade }} {{ prop.estado }}">
         <div class="card h-100 shadow-sm border-0 border-start border-4 border-success">
             <div class="card-header bg-white d-flex justify-content-between align-items-center pt-3">
                 <h5 class="mb-0 text-success fw-bold">
@@ -73,7 +81,7 @@
                     <a href="{% url 'propriedade_update' prop.id %}" class="btn btn-sm btn-outline-secondary me-1" title="Editar Propriedade">
                         <i class="bi bi-pencil"></i>
                     </a>
-                    <a href="{% url 'propriedade_delete' prop.id %}" class="btn btn-sm btn-outline-danger" title="Excluir Propriedade">
+                    <a href="{% url 'propriedade_delete' prop.id %}" class="btn btn-sm btn-outline-danger" data-confirm-delete="a propriedade '{{ prop.nome|escapejs }}'" title="Excluir Propriedade">
                         <i class="bi bi-trash"></i>
                     </a>
                 </div>

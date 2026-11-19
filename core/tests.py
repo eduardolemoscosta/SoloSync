@@ -206,3 +206,57 @@ class TalhaoDashboardTests(TestCase):
         novo_user = User.objects.filter(username='usuario_onboarding').first()
         self.assertIsNotNone(novo_user)
 
+
+class CrossUserAccessTests(TestCase):
+    def setUp(self):
+        self.owner = User.objects.create_user(username='owner', password='SenhaForte123!')
+        self.other = User.objects.create_user(username='other', password='SenhaForte123!')
+        self.property = Propriedade.objects.create(
+            usuario=self.owner,
+            nome='Fazenda Restrita',
+            latitude_sede=-5.89,
+            longitude_sede=-35.76,
+            area_total_ha=10,
+        )
+        self.talhao = Talhao.objects.create(
+            propriedade=self.property,
+            nome='Talhão Restrito',
+            area_m2=1000,
+            tipo_solo='Misto',
+        )
+        self.plantio = Plantio.objects.create(
+            talhao=self.talhao,
+            cultura='Milho',
+            data_plantio=date.today(),
+            ciclo_dias_estimado=120,
+            status='ATIVO',
+        )
+        self.client.login(username='other', password='SenhaForte123!')
+
+    def test_user_cannot_view_or_edit_other_property(self):
+        self.assertEqual(self.client.get(reverse('propriedade_update', args=[self.property.pk])).status_code, 404)
+        self.assertEqual(self.client.get(reverse('propriedade_delete', args=[self.property.pk])).status_code, 404)
+
+    def test_user_cannot_view_or_edit_other_talhao(self):
+        self.assertEqual(self.client.get(reverse('talhao_dashboard', args=[self.talhao.pk])).status_code, 404)
+        self.assertEqual(self.client.get(reverse('talhao_update', args=[self.talhao.pk])).status_code, 404)
+
+    def test_user_cannot_view_or_edit_other_plantio(self):
+        self.assertEqual(self.client.get(reverse('plantio_detail', args=[self.plantio.pk])).status_code, 404)
+        self.assertEqual(self.client.get(reverse('plantio_update', args=[self.plantio.pk])).status_code, 404)
+
+    def test_list_views_do_not_disclose_other_records(self):
+        response = self.client.get(reverse('dashboard'))
+        self.assertNotContains(response, 'Fazenda Restrita', status_code=200)
+        response = self.client.get(reverse('propriedade_list'))
+        self.assertNotContains(response, 'Fazenda Restrita', status_code=200)
+
+
+class StaticAssetTests(TestCase):
+    def test_javascript_asset_is_available(self):
+        from django.test import override_settings
+        from django.contrib.staticfiles.storage import staticfiles_storage
+        from django.contrib.staticfiles import finders
+
+        self.assertTrue(finders.find('js/solosync.js'))
+

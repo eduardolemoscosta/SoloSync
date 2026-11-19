@@ -42,10 +42,18 @@
     </div>
 </div>
 
+<div class="card card-body mb-3">
+    <div class="input-group">
+        <span class="input-group-text"><i class="bi bi-search"></i></span>
+        <input type="search" class="form-control" placeholder="Pesquisar talhão, propriedade ou tipo de solo" data-list-search="#lista-talhoes" data-search-count="#contador-talhoes" aria-label="Pesquisar talhões">
+        <span class="input-group-text" id="contador-talhoes"></span>
+    </div>
+</div>
+
 <form id="form-unir" method="post" action="{% url 'talhoes_unir' %}">
     {% csrf_token %}
     <div class="table-responsive">
-        <table class="table table-hover align-middle">
+        <table class="table table-hover align-middle" id="lista-talhoes">
             <thead class="table-light">
                 <tr>
                     <th class="col-w-40"><input class="form-check-input" type="checkbox" id="checkAll"></th>
@@ -58,7 +66,7 @@
             </thead>
             <tbody>
                 {% for talhao in talhoes %}
-                <tr>
+                <tr data-searchable="{{ talhao.nome }} {{ talhao.propriedade.nome }} {{ talhao.tipo_solo }}">
                     <td><input class="form-check-input talhao-check" type="checkbox" name="talhoes_ids" value="{{ talhao.id }}" data-area="{{ talhao.area_m2|stringformat:'f' }}"></td>
                     <td><strong>{{ talhao.nome }}</strong></td>
                     <td><span class="badge bg-light text-dark border"><i class="bi bi-geo-alt text-success"></i> {{ talhao.propriedade.nome }}</span></td>
@@ -75,7 +83,7 @@
                             <i class="bi bi-layout-split"></i> Dividir
                         </button>
                         <a href="{% url 'talhao_update' talhao.id %}" class="btn btn-sm btn-outline-secondary me-1"><i class="bi bi-pencil"></i></a>
-                        <a href="{% url 'talhao_delete' talhao.id %}" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></a>
+                        <a href="{% url 'talhao_delete' talhao.id %}" class="btn btn-sm btn-outline-danger" data-confirm-delete="o talhão '{{ talhao.nome|escapejs }}'"><i class="bi bi-trash"></i></a>
                     </td>
                 </tr>
                 {% empty %}
@@ -546,6 +554,31 @@
                 updateSomaDivisao();
             }
         });
+
+        // Filtro de pesquisa em tempo real
+        const searchInput = document.querySelector('input[type="search"][data-list-search="#lista-talhoes"]');
+        const listContainer = document.querySelector('#lista-talhoes tbody');
+        const originalRows = Array.from(listContainer.querySelectorAll('tr'));
+
+        if (searchInput) {
+            searchInput.addEventListener('input', function() {
+                const searchTerm = this.value.toLowerCase();
+                let visibleCount = 0;
+                
+                originalRows.forEach(row => {
+                    const textContent = row.textContent.toLowerCase();
+                    const isVisible = textContent.includes(searchTerm);
+                    row.style.display = isVisible ? '' : 'none';
+                    if (isVisible) visibleCount++;
+                });
+                
+                // Atualiza contador de resultados
+                const contadorElement = document.getElementById('contador-talhoes');
+                if (contadorElement) {
+                    contadorElement.textContent = `(${visibleCount})`;
+                }
+            });
+        }
     });
 </script>
 {% endblock %}

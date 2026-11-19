@@ -19,9 +19,17 @@
     </div>
 </div>
 
-<div class="row">
+<div class="card card-body mb-3">
+    <div class="input-group">
+        <span class="input-group-text"><i class="bi bi-search"></i></span>
+        <input type="search" class="form-control" placeholder="Pesquisar cultura, variedade, talhão ou status" data-list-search="#lista-plantios" data-search-count="#contador-plantios" aria-label="Pesquisar plantios">
+        <span class="input-group-text" id="contador-plantios"></span>
+    </div>
+</div>
+
+<div class="row" id="lista-plantios">
     {% for plantio in plantios %}
-    <div class="col-md-6 col-lg-4 mb-4">
+    <div class="col-md-6 col-lg-4 mb-4" data-searchable="{{ plantio.cultura }} {{ plantio.variedade }} {{ plantio.talhao.nome }} {{ plantio.get_status_display }}">
         <div class="card h-100 shadow-sm">
             <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">{{ plantio.cultura }}</h5>
@@ -55,7 +63,7 @@
                 </div>
                 <div>
                     <a href="{% url 'plantio_update' plantio.id %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-pencil"></i></a>
-                    <a href="{% url 'plantio_delete' plantio.id %}" class="btn btn-outline-danger btn-sm"><i class="bi bi-trash"></i></a>
+                    <a href="{% url 'plantio_delete' plantio.id %}" class="btn btn-outline-danger btn-sm" data-confirm-delete="o plantio '{{ plantio.cultura|escapejs }}'"><i class="bi bi-trash"></i></a>
                 </div>
             </div>
         </div>

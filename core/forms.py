@@ -48,6 +48,14 @@ class TalhaoForm(forms.ModelForm):
             self.fields['propriedade'].queryset = Propriedade.objects.filter(usuario=user)
             if not self.instance.pk and self.fields['propriedade'].queryset.exists():
                 self.fields['propriedade'].initial = self.fields['propriedade'].queryset.first()
+        self.fields['sistema_irrigacao'].required = False
+        self.fields['sistema_irrigacao'].initial = 'SEQUEIRO'
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if not cleaned_data.get('sistema_irrigacao'):
+            cleaned_data['sistema_irrigacao'] = Talhao.SISTEMA_IRRIGACAO_CHOICES[-1][0]
+        return cleaned_data
 
 
 class PlantioForm(forms.ModelForm):

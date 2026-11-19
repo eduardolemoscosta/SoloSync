@@ -17,7 +17,7 @@
                 </h5>
             </div>
             <div class="card-body p-4">
-                <form method="post">
+                <form method="post" data-client-validation="true" novalidate>
                     {% csrf_token %}
 
                     {% if form.non_field_errors %}
